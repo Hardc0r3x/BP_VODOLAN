@@ -1,0 +1,6 @@
+name,format,jackpot_odds,ticket_price_note,prize_mechanism,source_note,model_role
+Simulacni model BP,6/49,13983816,20 CZK,pevne vyhry a garantovany jackpot,vlastni model,simulovany model
+Sportka,6/49,13983816,promenna cena podle sloupcu a doplnkovych her,promenna/parimutuel vyherni jistina,Allwyn Cesko - referencni ramec,externi reference
+EuroJackpot,5/50 + 2/12,139838160,podle zeme a pravidel hry,jackpotova loterie s vice vyhernimi tridami,Eurojackpot - jackpot odds 1 ku 139 838 160,externi reference
+Mega Millions,5/70 + 1/24,290472336,5 USD od roku 2025,jackpotova loterie s pevnymi ne-jackpot vyhrami,Mega Millions - jackpot odds 1 ku 290 472 336,externi reference
+Powerball,5/69 + 1/26,292201338,2 USD zakladni tiket,jackpotova loterie s pevnymi ne-jackpot vyhrami,Powerball odds,externi reference

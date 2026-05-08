@@ -1,0 +1,17 @@
+[project]
+name = "simulace-lot"
+version = "0.2.1"
+description = "Simulace hernich strategii v ciselnych loteriich pro bakalarskou praci"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "scipy>=1.13",
+    "tqdm>=4.66",
+]
+
+[tool.uv]
+package = false
+dev-dependencies = [
+    "pyright>=1.1",
+]
