@@ -34,6 +34,16 @@ STRATEGY_COLORS = {
 }
 PALETTE = list(STRATEGY_COLORS.values())
 
+def _strategy_linestyle(name: str) -> str:
+    return STRATEGY_LINESTYLES.get(name, "-")
+
+STRATEGY_LINESTYLES = {
+    "Nahodna": "-",
+    "FixedCisla": "--",
+    "Martingale": "-",
+    "HotCold_hot": "-.",
+    "HotCold_cold": ":",
+}
 
 def _save(fig: plt.Figure, path: str | Path, dpi: int = 180) -> None:
     path = Path(path)
@@ -84,37 +94,68 @@ def plot_strategy_roi(stats: SberStatistik, output_path: str | Path) -> None:
 
 
 def plot_strategy_cumulative_loss(stats: SberStatistik, output_path: str | Path) -> None:
+    max_rounds = max((len(run.round_data) for run in stats.runs), default=0)
+    if max_rounds == 0:
+        return
+
     strat_runs: Dict[str, list[list[float]]] = defaultdict(list)
+
     for run in stats.runs:
+        run_rounds = len(run.round_data)
         by_strategy: Dict[str, list[list[float]]] = defaultdict(list)
+
         for agent in run.agent_summaries:
             cumulative = 0.0
             seq = []
+
             for record in agent.get("history", []):
                 cumulative += float(record.get("prize", 0)) - float(record.get("cost", 0))
                 seq.append(cumulative)
-            if seq:
-                by_strategy[agent["strategy"]].append(seq)
+
+            if not seq:
+                seq = [0.0] * run_rounds
+
+            if len(seq) < run_rounds:
+                seq = seq + [seq[-1]] * (run_rounds - len(seq))
+
+            if len(seq) > run_rounds:
+                seq = seq[:run_rounds]
+
+            by_strategy[agent["strategy"]].append(seq)
+
         for strategy, sequences in by_strategy.items():
-            max_len = max(len(seq) for seq in sequences)
-            mat = np.full((len(sequences), max_len), np.nan)
-            for i, seq in enumerate(sequences):
-                mat[i,:len(seq)] = seq
-            strat_runs[strategy].append(np.nanmean(mat, axis=0).tolist())
+            mat = np.array(sequences, dtype=float)
+            strat_runs[strategy].append(np.mean(mat, axis=0).tolist())
 
     fig, ax = plt.subplots(figsize=(11, 5))
+
     for strategy in sorted(strat_runs):
         curves = strat_runs[strategy]
-        max_len = max(len(curve) for curve in curves)
-        mat = np.full((len(curves), max_len), np.nan)
-        for i, curve in enumerate(curves):
-            mat[i,:len(curve)] = curve
-        mean_curve = np.nanmean(mat, axis=0)
-        ax.plot(np.arange(1, len(mean_curve) + 1), mean_curve, label=strategy, color=_strategy_color(strategy), linewidth=2)
+        fixed_curves = []
+
+        for curve in curves:
+            if len(curve) < max_rounds:
+                curve = curve + [curve[-1]] * (max_rounds - len(curve))
+            if len(curve) > max_rounds:
+                curve = curve[:max_rounds]
+            fixed_curves.append(curve)
+
+        mat = np.array(fixed_curves, dtype=float)
+        mean_curve = np.mean(mat, axis=0)
+
+        ax.plot(
+            np.arange(1, len(mean_curve) + 1),
+            mean_curve,
+            label=strategy,
+            color=_strategy_color(strategy),
+            linestyle=_strategy_linestyle(strategy),
+            linewidth=2,
+            alpha=0.9,
+        )
 
     ax.axhline(0, color="black", linestyle="--", linewidth=1)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
-    ax.set_title("Prumerny kumulativni vysledek agenta podle strategie")
+    ax.set_title("Prumerny kumulativni vysledek vsech hracu podle strategie")
     ax.set_xlabel("Kolo")
     ax.set_ylabel("Kumulativni zisk/ztrata (Kc)")
     ax.legend()
@@ -140,19 +181,33 @@ def plot_agent_survival(stats: SberStatistik, output_path: str | Path) -> None:
     max_rounds = max((len(run.round_data) for run in stats.runs), default=0)
     if max_rounds == 0:
         return
+
     active_counts: Dict[str, np.ndarray] = defaultdict(lambda: np.zeros(max_rounds))
     total_counts: Dict[str, int] = defaultdict(int)
+
     for run in stats.runs:
         for agent in run.agent_summaries:
             strategy = agent["strategy"]
             total_counts[strategy] += 1
+
             for r in range(min(int(agent["rounds_played"]), max_rounds)):
                 active_counts[strategy][r] += 1
+
     fig, ax = plt.subplots(figsize=(11, 5))
     rounds = np.arange(1, max_rounds + 1)
+
     for strategy in sorted(active_counts):
         pct = active_counts[strategy] / max(total_counts[strategy], 1) * 100
-        ax.plot(rounds, pct, label=strategy, color=_strategy_color(strategy), linewidth=2)
+        ax.plot(
+            rounds,
+            pct,
+            label=strategy,
+            color=_strategy_color(strategy),
+            linestyle=_strategy_linestyle(strategy),
+            linewidth=2,
+            alpha=0.9,
+        )
+
     ax.set_ylim(0, 105)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:.0f} %"))
     ax.set_title("Podil aktivnich agentu v prubehu simulace")
