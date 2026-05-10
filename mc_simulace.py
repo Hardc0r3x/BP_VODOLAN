@@ -12,6 +12,8 @@ from provozovatel import Provozovatel
 from statistiky import SberStatistik
 
 
+# hlavni trida co ridi cele monte carlo
+# opakuje jednotlive behy, v kazdem resetuje agenty a loterii
 class MCSimulace:
 
     def __init__(
@@ -23,9 +25,8 @@ class MCSimulace:
         self._config = config
         self._agents = agents
         self._stats = stats_collector or SberStatistik()
-        # dummy PRNG je jen pro vytvoreni loterie pred prvnim behem
+        # docasne PRNG - pred kazdym behem se stejne resetuji pres SeedSequence
         self._draw_prng = PRNG(0)
-        # dummy PRNG se v _run_single hned resetuje pres SeedSequence
         self._ticket_prng = PRNG(1)
         self._lottery = Loterie(config, self._draw_prng, self._ticket_prng)
         self._operator = Provozovatel(config)
@@ -48,6 +49,7 @@ class MCSimulace:
 
     def run(self, start_run_id: int = 0) -> SberStatistik:
         total = self._config.num_simulations
+        # z jednoho seedu se vyrobi nezavisle sekvence pro kazdy beh
         master = npr.SeedSequence(self._config.seed)
         run_sequences = master.spawn(start_run_id + total)[start_run_id:]
 
@@ -61,6 +63,7 @@ class MCSimulace:
         return self._stats
 
     def _run_single(self, run_id: int, run_ss: npr.SeedSequence) -> None:
+        # kazdy beh ma svuj vlastni seed - losovani a tikety maji oddelene proudy
         draw_ss, ticket_ss = run_ss.spawn(2)
         self._draw_prng.reset(draw_ss)
         self._ticket_prng.reset(ticket_ss)
@@ -80,9 +83,9 @@ class MCSimulace:
                     round_tickets += int(pending["tickets"])
                     pending_results.append((agent, pending))
 
-            # nejdrive se vyberou sazky, az potom se losuje
+            # nejdriv se vyberou sazky, az potom se losuje
             round_revenue = self._operator.collect_revenue(round_tickets)
-            # loterie si jen prevezme aktualni jackpot od provozovatele
+            # loterie prevezme aktualni jackpot od provozovatele
             self._lottery.update_jackpot(self._operator.jackpot_pool)
             drawn = self._lottery.conduct_draw()
 
@@ -91,14 +94,14 @@ class MCSimulace:
             for agent, pending in pending_results:
                 matches_for_agent = []
                 for numbers in pending.get("ticket_numbers", []):
-                    # spocitame pocet shod na jednom tiketu
+                    # kolik cisel trefil na jednom tiketu
                     matches = self._lottery.count_matches(numbers)
                     matches_for_agent.append(matches)
                     if matches == self._config.draw_size:
                         jackpot_winners += 1
                 flat_ticket_matches.append((agent, pending, matches_for_agent))
 
-            # pokud je vice jackpotu v kole, rozdeli se aktualni pool mezi ne
+            # vic vyhercich jackpotu ve stejnem kole = deli se
             jackpot_share = self._operator.jackpot_pool / jackpot_winners if jackpot_winners else None
 
             agent_results = []
@@ -106,7 +109,7 @@ class MCSimulace:
             for agent, pending, matches_for_agent in flat_ticket_matches:
                 prizes = []
                 for ticket_idx, matches in enumerate(matches_for_agent):
-                    # fixni vyhry zustanou fixni, jackpot bere podil z poolu
+                    # fixni vyhry zustanou fixni, jackpot bere podil
                     prize = self._lottery.prize_for_matches(matches, jackpot_share=jackpot_share)
                     prizes.append(prize)
                     if matches == self._config.draw_size:
@@ -131,7 +134,7 @@ class MCSimulace:
                 if requested_prize <= 0:
                     continue
 
-                # rozdelime vyhru agenta na fixni cast a jackpotovou cast
+                # rozdelit vyhru na fixni cast a jackpotovou cast
                 fixed_requested = 0.0
                 jackpot_requested = 0.0
                 ticket_matches = result.get("ticket_matches", [])
@@ -144,7 +147,7 @@ class MCSimulace:
 
                 paid_amount = 0.0
                 if fixed_requested > 0:
-                    # fixni vyhry za 3, 4 a 5 shod se plati z kapitalu
+                    # fixni vyhry se plati z kapitalu provozovatele
                     paid_fixed = self._operator.pay_prize(
                         fixed_requested,
                         current_round=self._lottery.current_round,
@@ -159,6 +162,7 @@ class MCSimulace:
                                 current_round=self._lottery.current_round,
                             )
                         agent.revoke_unpaid_prize(unpaid_amount)
+                        # provozovatel zkrachoval - zbytek hracu taky nedostane nic
                         for remaining_agent, remaining_result in agent_results[idx + 1:]:
                             remaining_prize = float(remaining_result.get("prize", 0.0))
                             if remaining_prize > 0:
@@ -171,7 +175,7 @@ class MCSimulace:
                     paid_amount += fixed_requested
 
                 if jackpot_requested > 0:
-                    # jackpotove vyhry se plati z oddeleneho jackpot poolu
+                    # jackpot se plati z oddeleneho fondu
                     paid_jackpot = self._operator.pay_prize(
                         jackpot_requested,
                         current_round=self._lottery.current_round,
@@ -201,9 +205,9 @@ class MCSimulace:
 
                 round_payouts_actual += paid_amount
 
-            # po vyplatach se jackpot dorovna na minimum, pokud je z ceho
+            # po vyplatach dorovnat jackpot na minimum
             self._operator.top_up_jackpot_pool(current_round=self._lottery.current_round)
-            # po dorovnani se loterie znovu sesynchronizuje s provozovatelem
+            # synchronizovat loterii s provozovatelem
             self._lottery.update_jackpot(self._operator.jackpot_pool)
 
             self._operator.record_round(round_revenue, round_payouts_actual)
@@ -221,11 +225,13 @@ class MCSimulace:
                 "jackpot_events": jackpot_events,
             })
 
+            # frekvence se updatuji az po vyhodnoceni, aby hotcold nevidel tohle kolo
             self._lottery.commit_draw_frequencies()
 
             if self._operator.is_bankrupt:
                 break
 
+        # ulozit vysledky behu do sberace statistik
         self._stats.record_run(
             run_id=run_id,
             operator_summary=self._operator.get_summary(),

@@ -8,8 +8,8 @@ if TYPE_CHECKING:
     from loterie import Loterie
 
 
-# referenční strategie - čistě náhodný výběr čísel každé kolo
-# slouží jako baseline pro porovnání ostatních strategií
+# nahodna strategie - cisla se vybíraji uplne nahodne kazde kolo
+# pouziva se hlavne jako baseline pro porovnani s ostatnima
 class NahodnaStrategie(Strategy):
 
     @property
@@ -17,7 +17,7 @@ class NahodnaStrategie(Strategy):
         return "Nahodna"
 
     def select_numbers(self, agent: "Agent", lottery: "Loterie") -> List[int]:
-        # každé kolo jiná náhodná čísla
+        # kazde kolo nahodne vylosuje novy set cisel
         return lottery.prng.draw_numbers(
             lottery.config.num_balls,
             lottery.config.draw_size,

@@ -8,11 +8,13 @@ import matplotlib.pyplot as plt
 
 
 def load_reference(path: str | Path = "data/real_lottery_reference.csv") -> List[Dict[str, str]]:
+    # nacte CSV s realnymi loteriemi pro srovnani
     with Path(path).open("r", newline="", encoding="utf-8") as f:
         return list(csv.DictReader(f))
 
 
 def export_reference_outputs(output_dir: str | Path = "output_bp/reference") -> None:
+    # exportuje referencni data a grafy pro porovnani modelu s realitou
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
     rows = load_reference()
@@ -25,6 +27,7 @@ def export_reference_outputs(output_dir: str | Path = "output_bp/reference") -> 
 
 
 def plot_jackpot_odds(rows, output_path: Path) -> None:
+    # sloupcovy graf srovnavajici sance na jackpot u ruznych loterii
     names = [r["name"] for r in rows]
     odds = [float(r["jackpot_odds"]) for r in rows]
     fig, ax = plt.subplots(figsize=(10, 5))
@@ -40,6 +43,7 @@ def plot_jackpot_odds(rows, output_path: Path) -> None:
 
 
 def plot_expected_jackpots(rows, output_path: Path) -> None:
+    # kolik jackpotu bychom ocekavali pri ruznem poctu prodanych tiketu
     ticket_counts = [1_000_000, 5_000_000, 10_000_000, 50_000_000]
     fig, ax = plt.subplots(figsize=(10, 5))
     for r in rows:

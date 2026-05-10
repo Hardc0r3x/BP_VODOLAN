@@ -5,26 +5,27 @@ from config import Config
 from prng import PRNG
 
 
+# hlavni trida loterie - losuje cisla, kontroluje tikety, spravuje jackpot
 class Loterie:
 
     def __init__(self, config: Config, draw_prng: PRNG, ticket_prng: PRNG | None = None) -> None:
         self._config = config
         self._draw_prng = draw_prng
-        # pokud není zvlášť ticket PRNG, použije se stejný jako pro losování
+        # kdyz neni zvlast PRNG pro tikety, pouzije se stejny jako pro losovani
         self._ticket_prng = ticket_prng if ticket_prng is not None else draw_prng
 
         self._current_round: int = 0
         self._drawn_numbers: Optional[List[int]] = None
-        self._drawn_set: set[int] = set()  # set je rychlejší pro hledání shod
+        self._drawn_set: set[int] = set()  # set je rychlejsi pro hledani shod nez list
 
-        # počítám jak často každé číslo padlo, pro HotCold strategii
+        # pocitam jak casto kazde cislo padlo - potrebuje to HotCold strategie
         self._number_frequencies: Dict[int, int] = {
             i: 0 for i in range(1, config.num_balls + 1)
         }
-        self._draw_history: List[List[int]] = []  # všechny tahy pro případnou analýzu
+        self._draw_history: List[List[int]] = []  # vsechny tahy pro pripadnou analyzu
 
         self._jackpot: float = config.min_jackpot
-        self._sorted_frequency_cache: Dict[str, List[int]] = {}  # cache aby se netřídilo každé kolo znova
+        self._sorted_frequency_cache: Dict[str, List[int]] = {}  # cache aby se netridilo kazdou rundu
 
     @property
     def config(self) -> Config:
@@ -65,37 +66,37 @@ class Loterie:
     def numbers_sorted_by_frequency(self, mode: str) -> Optional[List[int]]:
         if mode not in {"hot", "cold"}:
             raise ValueError("mode musi byt 'hot' nebo 'cold'")
-        # pokud ještě neproběhl žádný tah, nemáme frekvence
+        # jeste se nelosovalo, tak nemame frekvence
         if not any(self._number_frequencies.values()):
             return None
         if mode not in self._sorted_frequency_cache:
             numbers = list(range(1, self._config.num_balls + 1))
-            # zamíchám před tříděním aby čísla se stejnou frekvencí byla v náhodném pořadí
+            # zamicham pred tridenim aby cisla se stejnou frekvenci mela nahodne poradi
             self._ticket_prng.shuffle(numbers)
             self._sorted_frequency_cache[mode] = sorted(
                 numbers,
                 key=lambda n: self._number_frequencies.get(n, 0),
-                reverse=(mode == "hot"),  # hot = sestupně, cold = vzestupně
+                reverse=(mode == "hot"),  # hot = od nejcastejsich, cold = od nejridcejsich
             )
         return self._sorted_frequency_cache[mode]
 
     def conduct_draw(self) -> List[int]:
-        # samotné losování číslic pro toto kolo
+        # losovani cisel pro tohle kolo
         self._current_round += 1
         self._drawn_numbers = self._draw_prng.draw_numbers(
             self._config.num_balls, self._config.draw_size
         )
-        self._drawn_set = set(self._drawn_numbers)  # pro rychlé porovnání s tikety
+        self._drawn_set = set(self._drawn_numbers)  # set pro rychle porovnani
         self._draw_history.append(list(self._drawn_numbers))
         return self._drawn_numbers
 
     def commit_draw_frequencies(self) -> None:
-        # aktualizace frekvencí až po vyhodnocení tiketů, ne hned po losování
+        # aktualizovat frekvence az po vyhodnoceni tiketu, ne hned po losovani
         if self._drawn_numbers is None:
             return
         for n in self._drawn_numbers:
             self._number_frequencies[n] += 1
-        self._sorted_frequency_cache.clear()  # cache je zastaralá, smazat
+        self._sorted_frequency_cache.clear()  # stara cache uz neplati
 
     def count_matches(self, ticket_numbers: List[int]) -> int:
         if self._drawn_numbers is None:
@@ -108,18 +109,18 @@ class Loterie:
         return matches, prize
 
     def prize_for_matches(self, matches: int, jackpot_share: float | None = None) -> float:
-        # jackpot se dělí pokud vyhrál víc hráčů ve stejném kole
+        # vsech 6 cisel = jackpot (pripadne podil pokud vyhralo vic lidi najednou)
         if matches == self._config.draw_size:
             return self._jackpot if jackpot_share is None else jackpot_share
-        # fixni vyhry jsou jen pro 3, 4 a 5 shod podle configu
+        # za 3, 4 a 5 shod jsou fixni castky definovane v configu
         return self._config.fixed_prizes.get(matches, 0.0)
 
     def update_jackpot(self, new_value: float) -> None:
-        # loterie jen kopiruje hodnotu z provozovatele
+        # loterie si jen prevezme aktualni jackpot z provozovatele
         self._jackpot = float(new_value)
 
     def reset(self) -> None:
-        # reset před dalším MC během
+        # reset pred dalsim MC behem
         self._current_round = 0
         self._drawn_numbers = None
         self._drawn_set = set()

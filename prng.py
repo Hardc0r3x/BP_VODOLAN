@@ -6,7 +6,8 @@ import numpy as np
 import numpy.random as npr
 
 
-# wrapper kolem numpy generátoru, aby se dalo snadno resetovat a seedovat
+# obalka kolem numpy generatoru nahodnych cisel
+# pouzivam tuhle tridu aby se dalo snadno seedovat a resetovat mezi behy
 class PRNG:
 
     def __init__(self, seed: int | npr.SeedSequence = 42):
@@ -15,19 +16,19 @@ class PRNG:
 
     @staticmethod
     def _to_seed_sequence(seed: int | npr.SeedSequence) -> npr.SeedSequence:
-        # SeedSequence umí "spawning" - z jednoho seedu odvozuje nezávislé proudy
+        # SeedSequence umi spawning - z jednoho seedu vyrobi nezavisle proudy
         if isinstance(seed, npr.SeedSequence):
             return seed
         return npr.SeedSequence(int(seed))
 
     @staticmethod
     def _build_rng(seed_sequence: npr.SeedSequence) -> npr.Generator:
-        # MT19937 je klasický Mersenne Twister, dostatečný pro simulace
+        # mersenne twister - klasika, pro simulace uplne staci
         bit_generator = npr.MT19937(seed_sequence)
         return npr.Generator(bit_generator)
 
     def reset(self, seed: int | npr.SeedSequence | None = None) -> None:
-        # reset na začátek sekvence, volá se před každým MC během
+        # reset pred kazdym MC behem - vrati generator na zacatek
         if seed is not None:
             self._seed_sequence = self._to_seed_sequence(seed)
         self._rng = self._build_rng(self._seed_sequence)
@@ -40,11 +41,11 @@ class PRNG:
         if draw_size == 0:
             return []
 
-        # trik přes argpartition - rychlejší než shuffle + slice pro velké pooly
+        # trik pres argpartition - rychlejsi nez shuffle pro velke pooly
         keys = self._rng.random(pool_size)
         idx = np.argpartition(keys, draw_size - 1)[:draw_size]
-        idx.sort()  # seřazení indexů pro konzistentní výstup
-        return [int(n) + 1 for n in idx]  # +1 protože čísla loterie začínají od 1
+        idx.sort()  # seradit aby cisla byla v poradku
+        return [int(n) + 1 for n in idx]  # +1 protoze loterie cisluje od 1
 
     def uniform(self, low: float = 0.0, high: float = 1.0) -> float:
         return float(self._rng.uniform(low, high))

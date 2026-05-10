@@ -17,6 +17,7 @@ from tovarna_na_hrace import TovarnaNaHrace
 from vizualizace import generate_all, plot_scenario_comparison
 
 
+# dostupne profily pro spusteni
 PROFILES = {
     "quick": "rychla kontrola (100 MC behu)",
     "thesis": "hlavni experiment pro BP (1 000 MC behu)",
@@ -35,6 +36,7 @@ def _print_header(profile: str, config: Config) -> None:
 
 
 def _print_population(agents) -> None:
+    # vypise kolik agentu hraje jakou strategii
     counts: dict[str, int] = {}
     for agent in agents:
         counts[agent.strategy.name] = counts.get(agent.strategy.name, 0) + 1
@@ -44,6 +46,7 @@ def _print_population(agents) -> None:
 
 
 def run_baseline(config: Config, output_dir: Path, profile: str) -> SberStatistik:
+    # zakladni simulace se standardnim mixem strategii
     _print_header(profile, config)
     agents = TovarnaNaHrace.standard_mix(config)
     _print_population(agents)
@@ -52,6 +55,7 @@ def run_baseline(config: Config, output_dir: Path, profile: str) -> SberStatisti
     stats = SberStatistik()
     sim = MCSimulace(config=config, agents=agents, stats_collector=stats)
 
+    # progress bar aby bylo videt jak daleko to je
     pbar = tqdm(total=config.num_simulations, unit="beh")
     sim.set_progress_callback(lambda done, total: pbar.update(1))
     sim.run()
@@ -59,12 +63,14 @@ def run_baseline(config: Config, output_dir: Path, profile: str) -> SberStatisti
 
     stats.print_summary(config=config)
 
+    # vygenerovat grafy a exportovat data
     figures_dir = output_dir / "figures"
     csv_dir = output_dir / "csv"
     generate_all(stats, scenario_results=None, output_dir=str(figures_dir), config=config)
     stats.export_csv(csv_dir, config=config)
     export_reference_outputs(output_dir / "reference")
 
+    # ulozit metadata o behu aby bylo jasne s cim se to pustilo
     metadata = {
         "profile": profile,
         "config": asdict(config),
@@ -77,6 +83,7 @@ def run_baseline(config: Config, output_dir: Path, profile: str) -> SberStatisti
 
 
 def run_scenarios(base_config: Config, output_dir: Path) -> dict:
+    # pustit vsechny what-if scenare
     print("\n" + "=" * 72)
     print("  What-If scenare")
     print("=" * 72)
@@ -89,6 +96,7 @@ def run_scenarios(base_config: Config, output_dir: Path) -> dict:
 
 
 def run_specific_scenario(scenario_name: str, base_config: Config, output_dir: Path, profile: str) -> None:
+    # spustit jeden konkretni scenar
     runner = SpravceScenaru(base_config)
     scenario = runner.get(scenario_name)
     if scenario is None:
@@ -128,6 +136,7 @@ def list_scenarios(base_config: Config) -> None:
 
 
 def build_config_from_args(args: argparse.Namespace) -> Config:
+    # vezme profil a pripadne prepsane hodnoty z prikazove radky
     config = Config.profile(args.profile)
     overrides = {}
     if args.simulations is not None:
@@ -183,8 +192,10 @@ def main() -> None:
         run_specific_scenario(args.scenario, config, output_dir, args.profile)
         return
 
+    # hlavni beh - zakladni simulace
     run_baseline(config, output_dir, args.profile)
 
+    # volitelne scenare po baseline
     if args.scenarios:
         if args.profile == "deep":
             print("\nProfil deep je urceny pro baseline. Scenare spust pres --profile thesis nebo quick.")

@@ -5,40 +5,34 @@ from math import comb, exp
 from typing import Dict, Tuple
 
 
-# výchozí hodnoty pro loterii 6/49
+# vychozi nastaveni loterie 6 z 49
 LOTTERY_NAME: str = "Obecna ciselna loterie (6/49)"
 
-NUM_BALLS: int = 49   # celkem čísel v loterii
-DRAW_SIZE: int = 6    # kolik čísel se táhne
-TICKET_PRICE: float = 20.0  # cena jednoho tiketu v Kč
+NUM_BALLS: int = 49   # celkovy pocet cisel v loterii
+DRAW_SIZE: int = 6    # kolik cisel se tahne v jednom losovani
+TICKET_PRICE: float = 20.0  # cena jednoho tiketu v korunach
 
-PRIZE_POOL_RATIO: float = 0.50  # polovina trzeb jde do jackpotoveho poolu
+PRIZE_POOL_RATIO: float = 0.50  # 50 % trzeb jde do jackpotoveho fondu
 
-# fixní výhry pro nižší kategorie, jackpot se počítá dynamicky
+# fixni odmeny za nizsi pocty shod, jackpot se pocita jinak
 FIXED_PRIZES: Dict[int, float] = {
     3: 100.0,
     4: 1_000.0,
     5: 50_000.0,
 }
 
-JACKPOT_ROLLOVER: bool = True         # jackpot se přenáší do dalšího kola pokud nikdo nevyhrál
-MIN_JACKPOT: float = 1_000_000.0      # garantované minimum jackpotu
-OPERATOR_INITIAL_CAPITAL: float = 10_000_000.0  # startovní kapitál provozovatele
+JACKPOT_ROLLOVER: bool = True         # nevyhrana castka se prenasi do dalsiho kola
+MIN_JACKPOT: float = 1_000_000.0      # zakladni garantovany jackpot
+OPERATOR_INITIAL_CAPITAL: float = 10_000_000.0  # penize co ma provozovatel na zacatku
 
 NUM_AGENTS: int = 100
-AGENT_BUDGET_RANGE: Tuple[float, float] = (500.0, 5_000.0)  # rozpětí počátečních budgetů hráčů
-AGENT_CAUTIOUS_RATIO: float = 0.50  # polovina hracu je opatrna v kazde strategii
-HOT_COLD_POOL_MULTIPLIER: int = 3  # kolikrat vetsi kandidatni pool bere HotCold
-MARTINGALE_MAX_TICKETS: int = 16  # maximalni pocet tiketu pro Martingale
+AGENT_BUDGET_RANGE: Tuple[float, float] = (500.0, 5_000.0)  # rozpeti startovnich penez hracu
+AGENT_CAUTIOUS_RATIO: float = 0.50  # polovina hracu je opatrnych (v kazde strategii)
+HOT_COLD_POOL_MULTIPLIER: int = 3  # hotcold bere 3x vic cisel jako kandidaty a z nich pak vybira
+MARTINGALE_MAX_TICKETS: int = 16  # strop kolik tiketu muze martingale nakoupit naraz
 
-AGENT_STRATEGY_MIX: Dict[str, float] = {
-    "random": 0.35,
-    "fixed": 0.30,
-    "martingale": 0.20,
-    "hot_cold": 0.15,
-}
 
-NUM_ROUNDS: int = 52        # jedno "roční" kolo = 52 týdenních tahů
+NUM_ROUNDS: int = 52        # 52 kol = odpovida cca jednomu roku tydenni loterie
 NUM_SIMULATIONS: int = 1_000
 SEED: int = 42
 
@@ -63,14 +57,12 @@ class Config:
     agent_cautious_ratio: float = AGENT_CAUTIOUS_RATIO
     hot_cold_pool_multiplier: int = HOT_COLD_POOL_MULTIPLIER
     martingale_max_tickets: int = MARTINGALE_MAX_TICKETS
-    agent_strategy_mix: Dict[str, float] = field(default_factory=lambda: dict(AGENT_STRATEGY_MIX))
-
     num_rounds: int = NUM_ROUNDS
     num_simulations: int = NUM_SIMULATIONS
     seed: int = SEED
 
     def __post_init__(self) -> None:
-        # základní validace parametrů při vytvoření konfigurace
+        # kontrola aby se nekdo nepokusil spustit s nesmyslnyma hodnotama
         if self.draw_size >= self.num_balls:
             raise ValueError("draw_size musi byt mensi nez num_balls")
         if not (0 < self.prize_pool_ratio <= 1):
@@ -90,7 +82,7 @@ class Config:
 
     @staticmethod
     def profile(name: str) -> "Config":
-        # zkratky pro různé úrovně simulace
+        # prednastavene profily pro ruzne ucely
         key = name.lower().replace("_", "-")
         base = Config()
         if key == "quick":
@@ -102,36 +94,36 @@ class Config:
         raise ValueError(f"Neznamy profil: {name}")
 
     def jackpot_probability(self) -> float:
-        # C(49,6) = 13 983 816 kombinací
+        # C(49,6) = 13 983 816 moznych kombinaci, takze sance je 1 ku tomu
         return 1.0 / comb(self.num_balls, self.draw_size)
 
     def match_probability(self, k: int) -> float:
-        # hypergeometrické rozdělení - pravděpodobnost přesně k shod
+        # hypergeometricke rozdeleni - pravdepodobnost ze trefim presne k cisel
         n, N = self.draw_size, self.num_balls
         if k < 0 or k > n:
             return 0.0
         return comb(n, k) * comb(N - n, n - k) / comb(N, n)
 
     def expected_prize_per_ticket(self) -> float:
-        # střední hodnota výhry na jeden tiket
+        # prumerna ocekavana vyhra na jeden tiket (stredni hodnota)
         ev = self.min_jackpot * self.jackpot_probability()
         for k, prize in self.fixed_prizes.items():
             ev += prize * self.match_probability(k)
         return ev
 
     def theoretical_rtp(self) -> float:
-        # Return to Player v procentech - kolik % vsazených peněz se průměrně vrátí
+        # return to player - kolik procent vsazenych penez se prumerne vrati hracum
         return self.expected_prize_per_ticket() / self.ticket_price * 100
 
     def expected_value_per_ticket(self) -> float:
-        # záporné číslo = hráč průměrně tratí tolik za každý tiket
+        # ocekavana hodnota tiketu, skoro vzdy zaporna (hrac v prumeru traci)
         return self.expected_prize_per_ticket() - self.ticket_price
 
     def expected_jackpots(self, total_tickets: int | float) -> float:
         return float(total_tickets) * self.jackpot_probability()
 
     def probability_no_jackpot(self, total_tickets: int | float) -> float:
-        # Poissonova aproximace - pravděpodobnost že jackpot vůbec nenastane
+        # poissonova aproximace - pravdepodobnost ze jackpot vubec nepadne
         return exp(-self.expected_jackpots(total_tickets))
 
     def jackpot_diagnostics(self, total_tickets: int | float) -> dict:

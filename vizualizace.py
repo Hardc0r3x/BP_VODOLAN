@@ -15,6 +15,7 @@ from config import Config
 from statistiky import SberStatistik
 
 
+# globalni nastaveni grafu - bez ramecku nahore a vpravo, mrizka polopruhledna
 plt.rcParams.update({
     "figure.dpi": 120,
     "axes.spines.top": False,
@@ -25,6 +26,7 @@ plt.rcParams.update({
     "font.family": "DejaVu Sans",
 })
 
+# barvy pro jednotlive strategie - pouzivam vsude stejne
 STRATEGY_COLORS = {
     "Nahodna": "#16a34a",
     "FixedCisla": "#2563eb",
@@ -37,6 +39,7 @@ PALETTE = list(STRATEGY_COLORS.values())
 def _strategy_linestyle(name: str) -> str:
     return STRATEGY_LINESTYLES.get(name, "-")
 
+# ruzne styly car aby se daly rozlisit i v cernobilem tisku
 STRATEGY_LINESTYLES = {
     "Nahodna": "-",
     "FixedCisla": "--",
@@ -46,6 +49,7 @@ STRATEGY_LINESTYLES = {
 }
 
 def _save(fig: plt.Figure, path: str | Path, dpi: int = 180) -> None:
+    # ulozit graf do souboru
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
@@ -59,6 +63,7 @@ def _strategy_color(name: str) -> str:
 
 
 def plot_strategy_roi(stats: SberStatistik, output_path: str | Path) -> None:
+    # boxplot distribuce ROI pro kazdou strategii
     strategy_rois: Dict[str, list[float]] = defaultdict(list)
     for run in stats.runs:
         for agent in run.agent_summaries:
@@ -79,6 +84,7 @@ def plot_strategy_roi(stats: SberStatistik, output_path: str | Path) -> None:
         patch.set_facecolor(_strategy_color(label))
         patch.set_alpha(0.78)
 
+    # orez os aby outliery nezkreslily graf
     all_rois = [value for values in data for value in values]
     if all_rois:
         p1, p99 = np.percentile(all_rois, [1, 99])
@@ -94,6 +100,7 @@ def plot_strategy_roi(stats: SberStatistik, output_path: str | Path) -> None:
 
 
 def plot_strategy_cumulative_loss(stats: SberStatistik, output_path: str | Path) -> None:
+    # graf kumulativniho zisku/ztraty pres kola pro kazdou strategii
     max_rounds = max((len(run.round_data) for run in stats.runs), default=0)
     if max_rounds == 0:
         return
@@ -115,6 +122,7 @@ def plot_strategy_cumulative_loss(stats: SberStatistik, output_path: str | Path)
             if not seq:
                 seq = [0.0] * run_rounds
 
+            # doplnit na plny pocet kol kdyz hrac skoncil driv
             if len(seq) < run_rounds:
                 seq = seq + [seq[-1]] * (run_rounds - len(seq))
 
@@ -163,6 +171,7 @@ def plot_strategy_cumulative_loss(stats: SberStatistik, output_path: str | Path)
 
 
 def plot_strategy_bankruptcy(stats: SberStatistik, output_path: str | Path) -> None:
+    # sloupcovy graf miry bankrotu podle strategie
     data = stats.get_strategy_stats()
     labels = sorted(data)
     values = [data[label]["bankruptcy_rate_pct"] for label in labels]
@@ -178,6 +187,7 @@ def plot_strategy_bankruptcy(stats: SberStatistik, output_path: str | Path) -> N
 
 
 def plot_agent_survival(stats: SberStatistik, output_path: str | Path) -> None:
+    # jak rychle ubyvaji aktivni hraci v prubehu simulace
     max_rounds = max((len(run.round_data) for run in stats.runs), default=0)
     if max_rounds == 0:
         return
@@ -218,6 +228,7 @@ def plot_agent_survival(stats: SberStatistik, output_path: str | Path) -> None:
 
 
 def plot_operator_capital_distribution(stats: SberStatistik, output_path: str | Path) -> None:
+    # histogram konecneho kapitalu provozovatele pres vsechny MC behy
     finals = np.array([run.operator_summary["final_capital"] for run in stats.runs], dtype=float)
     initial = float(stats.runs[0].operator_summary["initial_capital"])
     mean = float(np.mean(finals))
@@ -239,6 +250,7 @@ def plot_operator_capital_distribution(stats: SberStatistik, output_path: str | 
 
 
 def plot_capital_timeseries(stats: SberStatistik, output_path: str | Path) -> None:
+    # vyvoj kapitalu provozovatele v case - prumer a 5.-95. percentil
     max_rounds = max((len(run.round_data) for run in stats.runs), default=0)
     if max_rounds == 0:
         return
@@ -262,6 +274,7 @@ def plot_capital_timeseries(stats: SberStatistik, output_path: str | Path) -> No
 
 
 def plot_operator_cashflow(stats: SberStatistik, output_path: str | Path) -> None:
+    # prumerne prijmy a vydaje provozovatele po kolech
     max_rounds = max((len(run.round_data) for run in stats.runs), default=0)
     if max_rounds == 0:
         return
@@ -287,6 +300,7 @@ def plot_operator_cashflow(stats: SberStatistik, output_path: str | Path) -> Non
 
 
 def plot_match_probability(stats: SberStatistik, config: Config, output_path: str | Path) -> None:
+    # srovnani teoretickych a simulovanych pravdepodobnosti vyher
     matches = [3, 4, 5, 6]
     theoretical = [config.match_probability(k) * 100 for k in matches]
     empirical = [stats.get_prize_stats(config)[k]["pct_actual"] for k in matches]
@@ -308,6 +322,7 @@ def plot_match_probability(stats: SberStatistik, config: Config, output_path: st
 
 
 def plot_rtp_distribution(stats: SberStatistik, config: Config, output_path: str | Path) -> None:
+    # histogram RTP pres vsechny MC behy
     rtps = []
     for run in stats.runs:
         rev = float(run.operator_summary.get("total_revenue", 0) or 0)
@@ -328,6 +343,7 @@ def plot_rtp_distribution(stats: SberStatistik, config: Config, output_path: str
 
 
 def plot_mc_convergence(stats: SberStatistik, config: Config, output_path: str | Path) -> None:
+    # graf jak prubezny prumer RTP konverguje s rostoucim poctem behu
     running = stats.get_convergence_stats()["running_mean_rtp"]
     if not running:
         return
@@ -343,6 +359,7 @@ def plot_mc_convergence(stats: SberStatistik, config: Config, output_path: str |
 
 
 def plot_number_frequencies(stats: SberStatistik, config: Config, output_path: str | Path) -> None:
+    # frekvence tazenych cisel - kontrola ze PRNG generuje rovnomerne
     counts: Counter[int] = Counter()
     for run in stats.runs:
         for row in run.round_data:
@@ -362,6 +379,7 @@ def plot_number_frequencies(stats: SberStatistik, config: Config, output_path: s
 
 
 def plot_jackpot_expectation(stats: SberStatistik, config: Config, output_path: str | Path) -> None:
+    # ukazuje kolik jackpotu bychom ocekavali pri ruznem poctu MC behu
     tickets_per_run = stats.total_tickets() / max(stats.num_runs, 1)
     runs = np.array([50, 100, 500, 1_000, 2_000, 5_000, 10_000])
     expected = runs * tickets_per_run * config.jackpot_probability()
@@ -384,6 +402,7 @@ def plot_jackpot_expectation(stats: SberStatistik, config: Config, output_path: 
 
 
 def plot_scenario_comparison(results: Dict[str, Dict[str, Any]], output_path: str | Path) -> None:
+    # trojity graf srovnavajici scenare - bankrot, kapital, marze
     names = list(results.keys())
     bankrupt = [results[name]["operator"]["bankruptcy_rate_pct"] for name in names]
     capital = [results[name]["operator"]["avg_final_capital"] / 1e6 for name in names]
@@ -412,6 +431,7 @@ def generate_all(
     output_dir: str | Path = "output",
     config: Optional[Config] = None,
 ) -> None:
+    # vygenerovat vsechny grafy najednou
     cfg = config or Config()
     output_dir = Path(output_dir)
     print("\nGeneruji grafy...")

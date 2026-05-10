@@ -8,11 +8,12 @@ if TYPE_CHECKING:
     from loterie import Loterie
 
 
-# strategie kde hráč hraje pořád stejná čísla - jako ti co mají "šťastná čísla"
+# strategie "stastna cisla" - hrac si jednou vybere cisla a pak je hraje porad dokola
+# hodne lidi v realite hraje takhle, tak jsem to chtěl otestovat
 class FixedCisla(Strategy):
 
     def __init__(self, fixed_numbers: Optional[List[int]] = None) -> None:
-        self._preset_numbers: Optional[List[int]] = fixed_numbers  # čísla zadaná zvenku
+        self._preset_numbers: Optional[List[int]] = fixed_numbers  # cisla zadana zvenku
         self._fixed_numbers: Optional[List[int]] = fixed_numbers
         self._initialized: bool = fixed_numbers is not None
 
@@ -22,7 +23,7 @@ class FixedCisla(Strategy):
 
     def select_numbers(self, agent: "Agent", lottery: "Loterie") -> List[int]:
         if not self._initialized:
-            # při prvním kole si náhodně vybere čísla a pak je drží celou simulaci
+            # v prvnim kole si nahodne vybere cisla a pak uz je drzi celou simulaci
             self._fixed_numbers = lottery.prng.draw_numbers(
                 lottery.config.num_balls,
                 lottery.config.draw_size,
@@ -34,7 +35,7 @@ class FixedCisla(Strategy):
         return 1
 
     def reset(self) -> None:
-        # při resetu se vrátí na přednastavená čísla (nebo se znovu náhodně vybere v 1. kole)
+        # pri resetu se vrati na puvodni cisla (nebo si v 1. kole vybere nova)
         if self._preset_numbers is not None:
             self._fixed_numbers = list(self._preset_numbers)
             self._initialized = True

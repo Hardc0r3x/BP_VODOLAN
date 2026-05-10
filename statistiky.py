@@ -10,6 +10,7 @@ import numpy as np
 from scipy import stats as scipy_stats
 
 
+# struktura pro ulozeni vysledku jednoho MC behu
 @dataclass
 class VysledekBehu:
     run_id: int
@@ -18,6 +19,7 @@ class VysledekBehu:
     round_data: List[Dict[str, Any]]
 
 
+# sberac statistik - sbira data ze vsech MC behu a pak je umi zpracovat
 class SberStatistik:
 
     def __init__(self) -> None:
@@ -62,6 +64,7 @@ class SberStatistik:
                 self._total_tickets += n_tickets
                 self._ticket_counts_by_strategy[strategy] += n_tickets
 
+                # ukladam jen to co potrebuju, plna historie by zabirala moc pameti
                 slim_history.append({
                     "round": result.get("round"),
                     "tickets": n_tickets,
@@ -108,6 +111,7 @@ class SberStatistik:
         self._jackpot_events.clear()
 
     def get_operator_stats(self) -> Dict[str, Any]:
+        # souhrnne statistiky provozovatele pres vsechny behy
         if not self._runs:
             return {}
 
@@ -144,6 +148,7 @@ class SberStatistik:
         }
 
     def calculate_theoretical_odds(self, num_balls: int = 49, draw_size: int = 6) -> Dict[int, float]:
+        # teoreticke pravdepodobnosti z kombinatoriky
         total_combinations = comb(num_balls, draw_size)
         odds = {}
         for matches in [3, 4, 5, 6]:
@@ -155,6 +160,7 @@ class SberStatistik:
         return odds
 
     def get_prize_stats(self, config=None) -> Dict[int, Dict[str, Any]]:
+        # porovnani empirickych a teoretickych pravdepodobnosti vyher
         theoretical_odds = {}
         if config is not None:
             theoretical_odds = self.calculate_theoretical_odds(config.num_balls, config.draw_size)
@@ -180,6 +186,7 @@ class SberStatistik:
         }
 
     def get_advanced_prize_stats(self) -> Dict[str, Any]:
+        # entropie rozdeleni vyher - jestli jsou vyhry rovnomerne nebo ne
         win_counts = [self._prize_counts.get(m, 0) for m in [3, 4, 5, 6]]
         total_wins = sum(win_counts)
         if total_wins == 0:
@@ -201,6 +208,7 @@ class SberStatistik:
         }
 
     def get_strategy_stats(self) -> Dict[str, Dict[str, Any]]:
+        # souhrnne metriky pro kazdou strategii pres vsechny behy
         strategy_data: Dict[str, List[Dict[str, Any]]] = {}
         for run in self._runs:
             for agent in run.agent_summaries:
@@ -242,6 +250,7 @@ class SberStatistik:
         return results
 
     def get_strategy_tests(self) -> Dict[str, Any]:
+        # statisticke testy jestli se strategie od sebe vyznacne lisi
         groups: Dict[str, List[float]] = {}
         for run in self._runs:
             by_strategy: Dict[str, List[float]] = {}
@@ -255,8 +264,10 @@ class SberStatistik:
         if len(arrays_by_name) < 2:
             return {"global": {}, "shapiro": [], "pairwise": []}
 
+        # kruskal-wallis test - neparametricky test pro vic skupin
         kw = scipy_stats.kruskal(*arrays_by_name.values())
 
+        # shapiro-wilk test normality pro kazdou strategii zvlast
         shapiro_rows = []
         for name, values in arrays_by_name.items():
             sample = values[:5000]
@@ -278,6 +289,7 @@ class SberStatistik:
                 "p_value": float(sh.pvalue),
             })
 
+        # parove mann-whitney testy s bonferroniho korekci
         names = sorted(arrays_by_name)
         raw_pairs = []
         for i, a in enumerate(names):
@@ -308,6 +320,7 @@ class SberStatistik:
         }
 
     def get_convergence_stats(self) -> Dict[str, Any]:
+        # prubezny prumer RTP pres behy - ukazuje konvergenci monte carlo
         rtps = []
         running = []
         for run in self._runs:
@@ -334,6 +347,7 @@ class SberStatistik:
         return list(self._jackpot_events)
 
     def export_csv(self, output_dir: str | Path, config=None) -> None:
+        # export vsech vysledku do CSV souboru
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
 

@@ -12,6 +12,7 @@ from statistiky import SberStatistik
 from tovarna_na_hrace import TovarnaNaHrace
 
 
+# scenar = jeden what-if experiment s konkretnim nastavenim a populaci
 @dataclass
 class Scenar:
     name: str
@@ -20,6 +21,7 @@ class Scenar:
     population_builder: Callable[[Config], List[Agent]]
 
 
+# spravce scenaru - drzi vsechny what-if varianty a umi je pustit najednou
 class SpravceScenaru:
 
     def __init__(self, base_config: Config) -> None:

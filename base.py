@@ -6,7 +6,8 @@ if TYPE_CHECKING:
     from loterie import Loterie
 
 
-# základní třída pro všechny hráče, nemůže se instanciovat přímo
+# zakladni trida hrace - vsichni hraci z ni dedi
+# sama o sobe se pouzit neda, proste definuje co kazdy hrac musi umet
 class Agent(ABC):
 
     def __init__(
@@ -18,16 +19,16 @@ class Agent(ABC):
     ) -> None:
         self._id = agent_id
         self._initial_budget = initial_budget
-        self._budget = initial_budget  # aktuální zůstatek, mění se každé kolo
+        self._budget = initial_budget  # kolik ma prave ted - meni se kazde kolo
         self._strategy = strategy
         self._ticket_price = ticket_price
 
-        self._total_spent: float = 0.0  # kolik celkem utratil za tikety
-        self._total_won: float = 0.0    # kolik celkem vyhrál
-        self._rounds_played: int = 0    # kolik kol odehrál
-        self._active: bool = True       # False = hráč zkrachoval a dál nehraje
+        self._total_spent: float = 0.0  # celkem utraceno za tikety
+        self._total_won: float = 0.0    # celkem vyhrano
+        self._rounds_played: int = 0    # pocet odehranych kol
+        self._active: bool = True       # false = dosly mu penize, uz nehraje
 
-        self._history: List[Dict[str, Any]] = []  # záznam každého kola
+        self._history: List[Dict[str, Any]] = []  # zaznam po kazdem kole
 
     @property
     def id(self) -> str:
@@ -59,14 +60,14 @@ class Agent(ABC):
 
     @property
     def net_profit(self) -> float:
-        # záporné číslo = tratí, kladné = vydělal (hodně nepravděpodobné)
+        # kladne = vydelal (coz se skoro nestane), zaporne = prodělal
         return self._total_won - self._total_spent
 
     @property
     def roi(self) -> float:
         if self._total_spent == 0:
             return 0.0
-        # ROI v procentech, typicky záporné
+        # return on investment v procentech, skoro vzdy zaporne
         return self.net_profit / self._total_spent * 100
 
     @property
@@ -80,29 +81,29 @@ class Agent(ABC):
     @property
     @abstractmethod
     def risk_profile(self) -> str:
-        # podtřídy vrátí řetězec jako "agresivni" nebo "opatrny"
+        # podtridy vrati "agresivni" nebo "opatrny"
         ...
 
     @abstractmethod
     def should_play(self) -> bool:
-        # každý typ hráče si sám rozhodne jestli hraje nebo přeskočí kolo
+        # kazdy typ hrace rozhodne sam jestli v tomhle kole hraje
         ...
 
     @abstractmethod
     def on_round_result(self, tickets_played: int, matches: int, prize: float) -> None:
-        # reakce hráče po výsledku kola (třeba Martingale zdvojí sázku)
+        # co hrac udela po vysledku kola (martingale treba zdvojnasobi sazku)
         ...
 
     def place_bets(self, lottery: "Loterie") -> Optional[Dict[str, Any]]:
-        # nejdřív zkontroluje jestli hráč vůbec chce hrát
+        # kontrola jestli hrac chce a muze hrat
         if not self._active or not self.should_play():
             return None
 
-        # strategie řekne kolik tiketu koupit
+        # strategie urcuje pocet tiketu pro toto kolo
         num_tickets = self._strategy.determine_num_tickets(self)
         cost = num_tickets * self._ticket_price
 
-        # pokud nemá dost peněz na plný počet, koupí co může
+        # nema na vsechny tikety? koupi kolik muze
         if cost > self._budget:
             num_tickets = max(1, int(self._budget // self._ticket_price))
             cost = num_tickets * self._ticket_price
@@ -110,13 +111,13 @@ class Agent(ABC):
             self._active = False
             return None
 
-        # pro každý tiket strategie vybere čísla
+        # pro kazdy tiket strategie vybere sadu cisel
         ticket_numbers = [
             self._strategy.select_numbers(self, lottery)
             for _ in range(num_tickets)
         ]
 
-        # odečtení ceny tiketů z rozpočtu
+        # strhne cenu tiketu z budgetu
         self._budget -= cost
         self._total_spent += cost
         self._rounds_played += 1
@@ -139,15 +140,15 @@ class Agent(ABC):
         cost = float(pending.get("cost", 0.0))
         num_tickets = int(pending.get("tickets", 0) or 0)
 
-        # přičtení výhry k rozpočtu
+        # pricte vyhru zpet do budgetu
         self._budget += total_prize
         self._total_won += total_prize
 
-        # strategie a hráč dostanou info o výsledku kola
+        # da vedet strategii a hraci jak dopadlo kolo
         self._strategy.on_round_result(self, best_matches, total_prize, cost)
         self.on_round_result(num_tickets, best_matches, total_prize)
 
-        # uložení záznamu kola do historie
+        # ulozi zaznam kola do historie pro pozdejsi analyzu
         record: Dict[str, Any] = {
             "round": pending.get("round"),
             "tickets": num_tickets,
@@ -163,7 +164,7 @@ class Agent(ABC):
         return record
 
     def play_round(self, lottery: "Loterie") -> Optional[Dict[str, Any]]:
-        # zjednodušená verze pro případ kdy losování probíhá uvnitř
+        # zkracena verze kde se losovani deje uvnitr
         pending = self.place_bets(lottery)
         if pending is None:
             return None
@@ -176,7 +177,7 @@ class Agent(ABC):
         return self.resolve_bets(pending, ticket_matches, ticket_prizes)
 
     def revoke_unpaid_prize(self, amount: float) -> None:
-        # provozovatel zkrachoval a nemůže vyplatit - vrátíme zpět co jsme přičetli
+        # provozovatel nema na vyplatu - musime odecist co jsme uz prictli
         if amount <= 0:
             return
         self._budget -= amount
@@ -187,7 +188,7 @@ class Agent(ABC):
             self._history[-1]["budget"] = self._budget
 
     def get_summary(self) -> Dict[str, Any]:
-        # shrnutí pro statistiky, volá se po každém MC běhu
+        # shrnuti pro statistiky, vola se na konci kazdeho MC behu
         skipped = int(getattr(self, "skipped_rounds", 0))
         return {
             "agent_id": self._id,
@@ -203,12 +204,12 @@ class Agent(ABC):
             "rounds_played": self._rounds_played,
             "skipped_rounds": skipped,
             "active": self._active,
-            "actual_bankrupt": self._budget < self._ticket_price,  # nestačí ani na jeden tiket
+            "actual_bankrupt": self._budget < self._ticket_price,  # nema ani na jeden tiket
             "history": self._history,
         }
 
     def reset(self, new_budget: Optional[float] = None) -> None:
-        # reset před dalším MC během, budget se vrátí na začátek
+        # reset na zacatek pred dalsim MC behem
         self._budget = new_budget if new_budget is not None else self._initial_budget
         self._total_spent = 0.0
         self._total_won = 0.0
@@ -224,7 +225,8 @@ class Agent(ABC):
         )
 
 
-# základní třída pro herní strategie
+# zakladni trida pro sazkove strategie
+# kazda strategie musi umet vybrat cisla a urcit pocet tiketu
 class Strategy(ABC):
 
     @property
@@ -234,16 +236,16 @@ class Strategy(ABC):
 
     @abstractmethod
     def select_numbers(self, agent: "Agent", lottery: "Loterie") -> List[int]:
-        # vrátí seznam čísel pro jeden tiket
+        # vrati seznam cisel na jeden tiket
         ...
 
     @abstractmethod
     def determine_num_tickets(self, agent: "Agent") -> int:
-        # vrátí kolik tiketů koupit toto kolo
+        # vrati kolik tiketu hrac koupí v tomhle kole
         ...
 
     def on_round_result(self, agent: "Agent", matches: int, prize: float, cost: float = 0.0) -> None:
-        # výchozí implementace nic nedělá, přepíše Martingale apod.
+        # vetsina strategii na vysledek nereaguje, ale treba martingale ano
         pass
 
     def reset(self) -> None:

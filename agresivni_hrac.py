@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from base import Strategy
 
 
-# agresivní hráč hraje vždy pokud má aspoň na jeden tiket, nikdy nepřeskakuje kola
+# agresivni hrac - hraje porad dokud ma na tiket, nikdy nepauznuje
 class AgresivniHrac(Agent):
 
     def __init__(
@@ -18,7 +18,7 @@ class AgresivniHrac(Agent):
         ticket_price: float,
     ) -> None:
         super().__init__(agent_id, initial_budget, strategy, ticket_price)
-        self._consecutive_wins: int = 0    # počet výher v řadě
+        self._consecutive_wins: int = 0    # kolik vyher za sebou
         self._on_winning_streak: bool = False
 
     @property
@@ -26,7 +26,7 @@ class AgresivniHrac(Agent):
         return "agresivni"
 
     def should_play(self) -> bool:
-        # agresivní hráč hraje dokud má peníze
+        # proste hraje dokud nema prazdno
         if self._budget < self._ticket_price:
             self._active = False
             return False
@@ -37,7 +37,7 @@ class AgresivniHrac(Agent):
             self._consecutive_wins += 1
             self._on_winning_streak = True
         else:
-            # prohra přeruší sérii
+            # prohra prerusi serii
             self._consecutive_wins = 0
             self._on_winning_streak = False
 
@@ -51,6 +51,6 @@ class AgresivniHrac(Agent):
 
     def reset(self, new_budget: float | None = None) -> None:
         super().reset(new_budget)
-        # reset série při novém MC běhu
+        # vynulovat serii pri novem MC behu
         self._consecutive_wins = 0
         self._on_winning_streak = False
