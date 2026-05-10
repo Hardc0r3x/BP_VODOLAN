@@ -87,18 +87,27 @@ class Provozovatel:
     def pay_prize(self, amount: float, current_round: int | None = None, is_jackpot: bool = False) -> bool:
         if amount <= 0:
             return True
+
+        # mala tolerance kvuli desetinnym cislum
+        eps = 0.000001
+
         if is_jackpot:
-            # jackpotova vyhra se plati z jackpotoveho fondu, ne z kapitalu
-            if self._bankrupt or self._jackpot_pool + 0.000001 < amount:
+            # jackpotova vyhra se plati z jackpotoveho fondu
+            # bankrot volneho kapitalu ji nema blokovat
+            if self._jackpot_pool + eps < amount:
                 self.register_unpaid_prize(amount, current_round=current_round)
                 return False
+
             self._jackpot_pool = max(0.0, self._jackpot_pool - amount)
             self._total_payouts += amount
             return True
-        # fixni vyhry (3, 4, 5 shod) se plati z volneho kapitalu
-        if self._bankrupt or self._capital < amount:
+
+        # fixni vyhry se plati z volneho kapitalu
+        # pokud je provozovatel v bankrotu nebo nema kapital, fixni vyhra se nevyplati
+        if self._bankrupt or self._capital + eps < amount:
             self.register_unpaid_prize(amount, current_round=current_round)
             return False
+
         self._capital -= amount
         self._total_payouts += amount
         return True
@@ -112,7 +121,7 @@ class Provozovatel:
         if self._bankrupt:
             return False
         # kapital nestaci na dorovnani - bankrot
-        if self._capital < missing:
+        if self._capital + 0.000001 < missing:
             self.register_unpaid_prize(missing, current_round=current_round)
             return False
         # presun penez z kapitalu do jackpotove rezervy
