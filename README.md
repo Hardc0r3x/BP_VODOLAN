@@ -4,6 +4,8 @@ Tohle je praktická část mé bakalářky. Simuluju zjednodušenou loterii 6/49
 
 Není to kalibrace Sportky, spíš model kde zkouším jestli různé strategie (Martingale, HotCold, fixní čísla atd.) nějak ovlivňují výsledky, nebo jestli je to prostě jedno a všichni stejně tratí.
 
+V základním běhu je populace rozdělená rovnoměrně mezi pět strategií. Při 100 agentech má každá strategie 20 hráčů: Nahodna, FixedCisla, Martingale, HotCold_hot a HotCold_cold.
+
 ## Co je potřeba
 
 - Python 3.11 nebo novější
@@ -15,12 +17,6 @@ uv sync
 
 
 ## Jak to spustit
-
-Hlavní simulace pro BP:
-
-
-uv run main.py
-
 
 Jsou tam tři profily:
 - `quick` - 100 běhů, rychlá kontrola jestli to vůbec funguje

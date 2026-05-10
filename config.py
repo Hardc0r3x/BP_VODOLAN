@@ -138,21 +138,41 @@ class Config:
             "probability_at_least_one_jackpot": 1 - p_zero,
         }
 
-    def summary_str(self) -> str:
-        mix_text = "20 % Nahodna, 20 % FixedCisla, 20 % Martingale, 20 % HotCold_hot, 20 % HotCold_cold"
+    def summary_str(self, agents: list | None = None) -> str:
         lines = [
             f"  Loterie: {self.lottery_name}",
             f"  Format: {self.draw_size}/{self.num_balls}",
             f"  Cena tiketu: {self.ticket_price:.0f} CZK",
             f"  Minimalni jackpot: {self.min_jackpot:,.0f} CZK",
             f"  P(jackpot): 1 / {comb(self.num_balls, self.draw_size):,.0f}",
-            f"  Teoreticke RTP modelu: {self.theoretical_rtp():.2f} %",
+            f"  Teoreticke RTP tiketu pri minimalnim jackpotu: {self.theoretical_rtp():.2f} %",
             f"  EV tiketu: {self.expected_value_per_ticket():.2f} CZK",
             f"  Pocet agentu: {self.num_agents}",
-            f"  Mix strategii baseline: {mix_text}",
-            f"  Mix typu: {self.agent_cautious_ratio * 100:.0f} % opatrnych / {(1 - self.agent_cautious_ratio) * 100:.0f} % agresivnich",
+        ]
+
+        if agents is not None and len(agents) > 0:
+            counts = {}
+            for agent in agents:
+                counts[agent.strategy.name] = counts.get(agent.strategy.name, 0) + 1
+            total = len(agents)
+            
+            mix_parts = []
+            for name, count in sorted(counts.items()):
+                pct = (count / total) * 100
+                mix_parts.append(f"{pct:.0f} % {name} ({count})")
+            mix_text = ", ".join(mix_parts)
+            lines.append(f"  Mix strategii: {mix_text}")
+
+            cautious = sum(1 for a in agents if getattr(a, "risk_profile", "") == "opatrny")
+            aggressive = total - cautious
+            lines.append(f"  Mix typu: {cautious/total*100:.0f} % opatrnych ({cautious}) / {aggressive/total*100:.0f} % agresivnich ({aggressive})")
+        else:
+            # Fallback when agents are not provided
+            lines.append(f"  Mix typu (cilovy): {self.agent_cautious_ratio * 100:.0f} % opatrnych / {(1 - self.agent_cautious_ratio) * 100:.0f} % agresivnich")
+
+        lines.extend([
             f"  Kol na beh: {self.num_rounds}",
             f"  MC behu: {self.num_simulations}",
             f"  Seed: {self.seed}",
-        ]
+        ])
         return "\n".join(lines)

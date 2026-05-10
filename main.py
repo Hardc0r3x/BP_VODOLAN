@@ -25,14 +25,14 @@ PROFILES = {
 }
 
 
-def _print_header(profile: str, config: Config) -> None:
+def _print_header(profile: str, config: Config, agents: list | None = None) -> None:
     print("=" * 72)
     print("  Simulace hernich strategii v ciselnych loteriich")
     print("  Bakalarska prace - agentni modelovani a Monte Carlo")
     print("=" * 72)
     print(f"Profil: {profile} - {PROFILES[profile]}")
     print("\nKonfigurace:")
-    print(config.summary_str())
+    print(config.summary_str(agents))
 
 
 def _print_population(agents) -> None:
@@ -47,8 +47,8 @@ def _print_population(agents) -> None:
 
 def run_baseline(config: Config, output_dir: Path, profile: str) -> SberStatistik:
     # zakladni simulace se standardnim mixem strategii
-    _print_header(profile, config)
     agents = TovarnaNaHrace.standard_mix(config)
+    _print_header(profile, config, agents)
     _print_population(agents)
 
     print(f"\nSpoustim zakladni simulaci ({config.num_simulations} behu)...")
@@ -107,10 +107,10 @@ def run_specific_scenario(scenario_name: str, base_config: Config, output_dir: P
         return
 
     config = scenario.config
-    _print_header(profile, config)
+    agents = scenario.population_builder(config)
+    _print_header(profile, config, agents)
     print(f"\nScenar: {scenario.name}")
     print(scenario.description)
-    agents = scenario.population_builder(config)
     _print_population(agents)
 
     print(f"\nSpoustim scenar ({config.num_simulations} behu)...")

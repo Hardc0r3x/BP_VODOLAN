@@ -51,6 +51,9 @@ class SpravceScenaru:
         return None
 
     def add_scenario(self, scenario: Scenar) -> None:
+        for existing in self._scenarios:
+            if existing.name == scenario.name:
+                raise ValueError(f"Scenar s nazvem {scenario.name} uz existuje")
         self._scenarios.append(scenario)
 
     def run_all(self, verbose: bool = True) -> Dict[str, Dict[str, Any]]:
