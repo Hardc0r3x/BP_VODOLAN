@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor obsahuje Martingale strategii.
+# Strategie zvysuje pocet tiketu po ztrate a resetuje az po pokryti deficitu.
 from typing import List, TYPE_CHECKING
 
 from base import Strategy
@@ -17,7 +20,7 @@ class MartingaleStrategie(Strategy):
         self._base_tickets = base_tickets      # kolik tiketu na zacatku
         self._max_tickets = max_tickets        # strop aby nekupoval stovky tiketu
         self._current_tickets = base_tickets   # aktualni pocet pro dalsi kolo
-        self._consecutive_losses = 0           # kolik kol za sebou prohrál
+        self._consecutive_losses = 0           # kolik kol za sebou prohral
         self._deficit = 0.0                    # kumulovana ztrata od posledniho resetu
 
     @property
@@ -25,7 +28,7 @@ class MartingaleStrategie(Strategy):
         return "Martingale"
 
     def select_numbers(self, agent: "Agent", lottery: "Loterie") -> List[int]:
-        # martingale nema zadnou chytrou metodu vybirani cisel, proste nahodne
+        # martingale meni pocet tiketu, ale cisla vybira nahodne
         return lottery.prng.draw_numbers(
             lottery.config.num_balls,
             lottery.config.draw_size,
@@ -38,7 +41,7 @@ class MartingaleStrategie(Strategy):
         return min(self._current_tickets, self._max_tickets, affordable)
 
     def on_round_result(self, agent: "Agent", matches: int, prize: float, cost: float = 0.0) -> None:
-        # prepocita deficit - kolik celkem tratí od posledniho resetu
+        # prepocita deficit - kolik celkem trati od posledniho resetu
         self._deficit += float(cost) - float(prize)
         # kdyz se deficit dostal na nulu nebo do plusu, strategie se restartuje
         if self._deficit <= 0:

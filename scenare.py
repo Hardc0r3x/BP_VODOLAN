@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Soubor definuje what-if scenare.
+# Kazdy scenar meni jednu cast nastaveni a porovnava dopady.
+
 import csv
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -15,9 +18,13 @@ from tovarna_na_hrace import TovarnaNaHrace
 # scenar = jeden what-if experiment s konkretnim nastavenim a populaci
 @dataclass
 class Scenar:
+    # kratky nazev scenare
     name: str
+    # popis co scenar meni
     description: str
+    # konfigurace pouzita ve scenari
     config: Config
+    # funkce, ktera vytvori populaci hracu
     population_builder: Callable[[Config], List[Agent]]
 
 
@@ -25,6 +32,7 @@ class Scenar:
 class SpravceScenaru:
 
     def __init__(self, base_config: Config) -> None:
+        # ulozime zakladni konfiguraci
         self._base = base_config
         self._scenarios = self._build_scenarios()
 
@@ -33,6 +41,7 @@ class SpravceScenaru:
         return list(self._scenarios)
 
     def _build_scenarios(self) -> List[Scenar]:
+        # vyjdeme ze zakladni konfigurace a nektere hodnoty zmenime pres replace
         base = self._base
         return [
             Scenar("baseline", "Standardni mix strategii a typu hracu (referencni stav).", base, TovarnaNaHrace.standard_mix),
@@ -45,18 +54,15 @@ class SpravceScenaru:
         ]
 
     def get(self, scenario_name: str) -> Scenar | None:
+        # najdeme scenar podle nazvu
+        # projdeme vsechny pripravene scenare
         for scenario in self._scenarios:
             if scenario.name == scenario_name:
                 return scenario
         return None
 
-    def add_scenario(self, scenario: Scenar) -> None:
-        for existing in self._scenarios:
-            if existing.name == scenario.name:
-                raise ValueError(f"Scenar s nazvem {scenario.name} uz existuje")
-        self._scenarios.append(scenario)
-
     def run_all(self, verbose: bool = True) -> Dict[str, Dict[str, Any]]:
+        # sem se ulozi vysledky vsech scenaru
         results: Dict[str, Dict[str, Any]] = {}
         for scenario in self._scenarios:
             if verbose:
@@ -64,10 +70,13 @@ class SpravceScenaru:
                 print(f"  {scenario.description}")
                 print(f"  Spoustim {scenario.config.num_simulations} behu...")
 
+            # pro scenar vytvorime jeho populaci hracu
             agents = scenario.population_builder(scenario.config)
+            # kazdy scenar ma vlastni sberac statistik
             stats = SberStatistik()
             MCSimulace(scenario.config, agents, stats).run()
 
+            # ulozime dulezite vystupy scenare
             results[scenario.name] = {
                 "operator": stats.get_operator_stats(),
                 "strategies": stats.get_strategy_stats(),
@@ -104,6 +113,7 @@ class SpravceScenaru:
         print("=" * 96)
 
     def export_comparison_csv(self, results: Dict[str, Dict[str, Any]], output_path: str | Path) -> None:
+        # pripravime radky pro CSV export scenaru
         rows = []
         for name, data in results.items():
             op = data["operator"]
@@ -121,6 +131,7 @@ class SpravceScenaru:
                 "avg_total_revenue": op["avg_total_revenue"],
                 "avg_total_payouts": op["avg_total_payouts"],
             })
+        # pripravime cestu a vystupni slozku
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         if not rows:

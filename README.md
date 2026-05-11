@@ -18,6 +18,12 @@ uv sync
 
 ## Jak to spustit
 
+Hlavní simulace pro BP:
+
+
+uv run main.py
+
+
 Jsou tam tři profily:
 - `quick` - 100 běhů, rychlá kontrola jestli to vůbec funguje
 - `thesis` - 1000 běhů, to co jde do práce (výchozí)

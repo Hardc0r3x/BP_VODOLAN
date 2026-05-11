@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor obsahuje strategii hot/cold.
+# Strategie vybira z cisel podle minulych frekvenci, ne podle aktualniho tahu.
 from typing import List, TYPE_CHECKING
 
 from base import Strategy

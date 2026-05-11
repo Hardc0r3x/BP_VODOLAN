@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Soubor obaluje generator nahodnych cisel.
+# Diky tomu se daji behy opakovat se stejnym seedem.
+
 from typing import List, Sequence
 
 import numpy as np
@@ -23,7 +26,7 @@ class PRNG:
 
     @staticmethod
     def _build_rng(seed_sequence: npr.SeedSequence) -> npr.Generator:
-        # mersenne twister - klasika, pro simulace uplne staci
+        # pouziva se Mersenne Twister, aby byl generator stabilni a opakovatelny
         bit_generator = npr.MT19937(seed_sequence)
         return npr.Generator(bit_generator)
 
@@ -49,9 +52,6 @@ class PRNG:
 
     def uniform(self, low: float = 0.0, high: float = 1.0) -> float:
         return float(self._rng.uniform(low, high))
-
-    def randint(self, low: int, high: int) -> int:
-        return int(self._rng.integers(low, high + 1))
 
     def choice(self, arr: Sequence, size: int = 1, replace: bool = False) -> np.ndarray:
         return self._rng.choice(arr, size=size, replace=replace)

@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor obsahuje strategii s pevne zvolenymi cisly.
+# Hrac si cisla vybere jednou a pak je opakuje.
 from typing import List, Optional, TYPE_CHECKING
 
 from base import Strategy
@@ -9,7 +12,7 @@ if TYPE_CHECKING:
 
 
 # strategie "stastna cisla" - hrac si jednou vybere cisla a pak je hraje porad dokola
-# hodne lidi v realite hraje takhle, tak jsem to chtěl otestovat
+# hodne lidi v realite hraje takhle, tak jsem to chtel otestovat
 class FixedCisla(Strategy):
 
     def __init__(self, fixed_numbers: Optional[List[int]] = None) -> None:

@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor definuje agresivni typ hrace.
+# Tento hrac hraje dokud ma penize alespon na jeden tiket.
 from typing import TYPE_CHECKING
 
 from base import Agent
@@ -24,7 +27,7 @@ class AgresivniHrac(Agent):
         return "agresivni"
 
     def should_play(self) -> bool:
-        # proste hraje dokud nema prazdno
+        # hraje, dokud ma penize alespon na jeden tiket
         if self._budget < self._ticket_price:
             self._active = False
             return False

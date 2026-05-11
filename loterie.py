@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor obsahuje samotnou loterii.
+# Loterie losuje cisla, pocita shody a zna aktualni jackpot.
 from typing import Dict, List, Optional, Tuple
 
 from config import Config
@@ -9,6 +12,7 @@ from prng import PRNG
 class Loterie:
 
     def __init__(self, config: Config, draw_prng: PRNG, ticket_prng: PRNG | None = None) -> None:
+        # ulozime konfiguraci a generatory nahodnych cisel
         self._config = config
         self._draw_prng = draw_prng
         # kdyz neni zvlast PRNG pro tikety, pouzije se stejny jako pro losovani
@@ -64,12 +68,14 @@ class Loterie:
         return self._draw_history
 
     def numbers_sorted_by_frequency(self, mode: str) -> Optional[List[int]]:
+        # hot/cold musi byt jen jeden z povolenych modu
         if mode not in {"hot", "cold"}:
             raise ValueError("mode musi byt 'hot' nebo 'cold'")
         # jeste se nelosovalo, tak nemame frekvence
         if not any(self._number_frequencies.values()):
             return None
         if mode not in self._sorted_frequency_cache:
+            # pripravime vsechna cisla loterie
             numbers = list(range(1, self._config.num_balls + 1))
             # zamicham pred tridenim aby cisla se stejnou frekvenci mela nahodne poradi
             self._ticket_prng.shuffle(numbers)
@@ -101,9 +107,11 @@ class Loterie:
     def count_matches(self, ticket_numbers: List[int]) -> int:
         if self._drawn_numbers is None:
             raise RuntimeError("Kolo nebylo losovano. Nejdrive zavolej conduct_draw().")
+        # spocitame pocet cisel z tiketu, ktera jsou ve vylosovane sade
         return sum(1 for n in ticket_numbers if n in self._drawn_set)
 
     def check_ticket(self, ticket_numbers: List[int], jackpot_share: float | None = None) -> Tuple[int, float]:
+        # nejdriv zjistime pocet shod
         matches = self.count_matches(ticket_numbers)
         prize = self.prize_for_matches(matches, jackpot_share=jackpot_share)
         return matches, prize
@@ -121,6 +129,7 @@ class Loterie:
 
     def reset(self) -> None:
         # reset pred dalsim MC behem
+        # vratime loterii do vychoziho stavu
         self._current_round = 0
         self._drawn_numbers = None
         self._drawn_set = set()

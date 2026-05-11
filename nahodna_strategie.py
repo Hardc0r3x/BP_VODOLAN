@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor obsahuje nahodnou strategii.
+# Kazdy tiket ma cisla vybrana nahodne.
 from typing import List, TYPE_CHECKING
 
 from base import Strategy
@@ -8,7 +11,7 @@ if TYPE_CHECKING:
     from loterie import Loterie
 
 
-# nahodna strategie - cisla se vybíraji uplne nahodne kazde kolo
+# nahodna strategie - cisla se vybiraji uplne nahodne kazde kolo
 # pouziva se hlavne jako baseline pro porovnani s ostatnima
 class NahodnaStrategie(Strategy):
 

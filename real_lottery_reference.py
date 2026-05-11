@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Soubor vytvari referencni vystupy pro realne loterie.
+# Neslouzi ke kalibraci, jen ke srovnani v praci.
+
 import csv
 from pathlib import Path
 from typing import Dict, List

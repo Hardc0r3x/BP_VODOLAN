@@ -12,6 +12,3 @@ dependencies = [
 
 [tool.uv]
 package = false
-dev-dependencies = [
-    "pyright>=1.1",
-]

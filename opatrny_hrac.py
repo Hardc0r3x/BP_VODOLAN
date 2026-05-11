@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor definuje opatrny typ hrace.
+# Tento hrac prestane hrat, kdyz mu budget klesne pod rezervu.
 from typing import TYPE_CHECKING
 
 from base import Agent

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+# Soubor vytvari grafy pro praci.
+# Grafy pouzivaji data ze sberace statistik a ukladaji se do PNG.
+
 from collections import Counter, defaultdict
-from math import comb
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -36,9 +38,6 @@ STRATEGY_COLORS = {
 }
 PALETTE = list(STRATEGY_COLORS.values())
 
-def _strategy_linestyle(name: str) -> str:
-    return STRATEGY_LINESTYLES.get(name, "-")
-
 # ruzne styly car aby se daly rozlisit i v cernobilem tisku
 STRATEGY_LINESTYLES = {
     "Nahodna": "-",
@@ -48,10 +47,16 @@ STRATEGY_LINESTYLES = {
     "HotCold_cold": ":",
 }
 
+def _strategy_linestyle(name: str) -> str:
+    # podle nazvu strategie vratime styl cary
+    return STRATEGY_LINESTYLES.get(name, "-")
+
 def _save(fig: plt.Figure, path: str | Path, dpi: int = 180) -> None:
     # ulozit graf do souboru
     path = Path(path)
+    # vytvorime slozku, pokud jeste neexistuje
     path.parent.mkdir(parents=True, exist_ok=True)
+    # upravime okraje, aby se nic neprekryvalo
     fig.tight_layout()
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
@@ -59,6 +64,7 @@ def _save(fig: plt.Figure, path: str | Path, dpi: int = 180) -> None:
 
 
 def _strategy_color(name: str) -> str:
+    # kdyz strategie nema vlastni barvu, pouzije se seda
     return STRATEGY_COLORS.get(name, "#666666")
 
 
@@ -66,12 +72,16 @@ def plot_strategy_roi(stats: SberStatistik, output_path: str | Path) -> None:
     # boxplot distribuce ROI pro kazdou strategii
     strategy_rois: Dict[str, list[float]] = defaultdict(list)
     for run in stats.runs:
+        # projdeme agenty a vezmeme jejich historii
         for agent in run.agent_summaries:
             strategy_rois[agent["strategy"]].append(float(agent["roi"]))
 
+    # popisky strategii udelame ve stabilnim poradi
     labels = sorted(strategy_rois)
+    # data pro boxplot pripravime podle popisku
     data = [strategy_rois[label] for label in labels]
 
+    # vytvorime obrazek, sirka se prizpusobi poctu strategii
     fig, ax = plt.subplots(figsize=(max(9, len(labels) * 2.0), 5))
     bp = ax.boxplot(
         data, patch_artist=True, showfliers=True,
@@ -105,10 +115,12 @@ def plot_strategy_cumulative_loss(stats: SberStatistik, output_path: str | Path)
     if max_rounds == 0:
         return
 
+    # do tohoto slovniku dame rady zisku/ztrat podle strategie
     strat_runs: Dict[str, list[list[float]]] = defaultdict(list)
 
     for run in stats.runs:
         run_rounds = len(run.round_data)
+        # v jednom behu si nejdriv seskupime agenty podle strategie
         by_strategy: Dict[str, list[list[float]]] = defaultdict(list)
 
         for agent in run.agent_summaries:
@@ -254,6 +266,7 @@ def plot_capital_timeseries(stats: SberStatistik, output_path: str | Path) -> No
     max_rounds = max((len(run.round_data) for run in stats.runs), default=0)
     if max_rounds == 0:
         return
+    # matice drzi kapital po kolech, chybejici hodnoty jsou NaN
     mat = np.full((len(stats.runs), max_rounds), np.nan)
     for i, run in enumerate(stats.runs):
         for j, row in enumerate(run.round_data):
@@ -397,7 +410,7 @@ def plot_jackpot_expectation(stats: SberStatistik, config: Config, output_path: 
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
-    ax1.set_title("Vliv poctu MC behu na pozorovani vzacneho jackpotu")
+    ax1.set_title("Vliv poctu Monte Carlo behu na ocekavany pocet jackpotu")
     _save(fig, output_path)
 
 

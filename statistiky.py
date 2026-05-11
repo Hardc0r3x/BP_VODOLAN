@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Soubor sbira a zpracovava vysledky simulace.
+# Z techto dat se pak delaji tabulky, grafy a CSV vystupy.
+
 import csv
 from dataclasses import dataclass
 from math import comb
@@ -13,9 +16,13 @@ from scipy import stats as scipy_stats
 # struktura pro ulozeni vysledku jednoho MC behu
 @dataclass
 class VysledekBehu:
+    # cislo MC behu
     run_id: int
+    # souhrn provozovatele za jeden beh
     operator_summary: Dict[str, Any]
+    # souhrny vsech agentu v behu
     agent_summaries: List[Dict[str, Any]]
+    # souhrny jednotlivych kol
     round_data: List[Dict[str, Any]]
 
 
@@ -23,7 +30,9 @@ class VysledekBehu:
 class SberStatistik:
 
     def __init__(self) -> None:
+        # sem se ukladaji vysledky vsech MC behu
         self._runs: List[VysledekBehu] = []
+        # pocitadla vyher podle poctu shod
         self._prize_counts: Dict[int, int] = {3: 0, 4: 0, 5: 0, 6: 0}
         self._total_tickets: int = 0
         self._prize_counts_by_strategy: Dict[str, Dict[int, int]] = {}
@@ -37,18 +46,24 @@ class SberStatistik:
         agent_summaries: List[Dict[str, Any]],
         round_data: List[Dict[str, Any]],
     ) -> None:
+        # ulozime zkracene zaznamy agentu, aby se setrila pamet
         stored_agents: List[Dict[str, Any]] = []
 
+        # projdeme vsechny agenty z jednoho behu
         for agent in agent_summaries:
+            # zjistime strategii agenta
             strategy = agent.get("strategy", "Unknown")
             self._prize_counts_by_strategy.setdefault(strategy, {3: 0, 4: 0, 5: 0, 6: 0})
             self._ticket_counts_by_strategy.setdefault(strategy, 0)
 
+            # historie agenta se zkrati jen na dulezite polozky
             slim_history = []
             for result in agent.get("history", []):
+                # pocet tiketu v danem kole
                 n_tickets = int(result.get("tickets", 0) or 0)
                 ticket_matches = result.get("ticket_matches")
 
+                # pokud mame shody po jednotlivych tiketech, pocitame kazdy tiket zvlast
                 if isinstance(ticket_matches, list):
                     for matches in ticket_matches:
                         matches = int(matches)
@@ -61,6 +76,7 @@ class SberStatistik:
                         self._prize_counts[matches] += 1
                         self._prize_counts_by_strategy[strategy][matches] += 1
 
+                # pricteme tikety do globalniho i strategickeho souctu
                 self._total_tickets += n_tickets
                 self._ticket_counts_by_strategy[strategy] += n_tickets
 
@@ -75,20 +91,24 @@ class SberStatistik:
                     "unpaid_prize": float(result.get("unpaid_prize", 0) or 0),
                 })
 
+            # vytvorime kopii agenta se zkracenou historii
             stored_agent = dict(agent)
             stored_agent["history"] = slim_history
             stored_agents.append(stored_agent)
 
+        # jackpotove udalosti ukladame zvlast pro diagnostiku
         for round_row in round_data:
             for event in round_row.get("jackpot_events", []) or []:
                 self._jackpot_events.append(dict(event))
 
+        # do beznych kol uz jackpot_events nedavame, aby se data neduplikovala
         stored_rounds = []
         for row in round_data:
             slim_row = dict(row)
             slim_row.pop("jackpot_events", None)
             stored_rounds.append(slim_row)
 
+        # nakonec ulozime jeden hotovy MC beh
         self._runs.append(VysledekBehu(run_id, operator_summary, stored_agents, stored_rounds))
 
     @property
@@ -115,6 +135,7 @@ class SberStatistik:
         if not self._runs:
             return {}
 
+        # vybereme zakladni rady hodnot z ulozenych behu
         finals = np.array([r.operator_summary["final_capital"] for r in self._runs], dtype=float)
         profits = np.array([r.operator_summary["net_profit"] for r in self._runs], dtype=float)
         margins = np.array([r.operator_summary["profit_margin"] for r in self._runs], dtype=float)
@@ -122,9 +143,11 @@ class SberStatistik:
         revenues = np.array([r.operator_summary.get("total_revenue", 0) for r in self._runs], dtype=float)
         payouts = np.array([r.operator_summary.get("total_payouts", 0) for r in self._runs], dtype=float)
 
+        # prumer z boolean hodnot dava podil bankrotu
         bankruptcy_rate = float(np.mean(bankrupt) * 100)
         total_revenue_all = float(np.sum(revenues))
         total_payouts_all = float(np.sum(payouts))
+        # vratime slovnik hodnot pro tabulky a grafy
         return {
             "num_runs": len(self._runs),
             "bankruptcy_rate_pct": bankruptcy_rate,
@@ -149,12 +172,14 @@ class SberStatistik:
 
     def calculate_theoretical_odds(self, num_balls: int = 49, draw_size: int = 6) -> Dict[int, float]:
         # teoreticke pravdepodobnosti z kombinatoriky
+        # celkovy pocet moznych tiketu
         total_combinations = comb(num_balls, draw_size)
         odds = {}
         for matches in [3, 4, 5, 6]:
             if matches > draw_size or draw_size - matches > num_balls - draw_size:
                 odds[matches] = 0.0
                 continue
+            # pocet kombinaci, ktere trefi presne dany pocet cisel
             ways = comb(draw_size, matches) * comb(num_balls - draw_size, draw_size - matches)
             odds[matches] = ways / total_combinations * 100
         return odds
@@ -176,46 +201,18 @@ class SberStatistik:
             }
         return results
 
-    def get_prize_stats_by_strategy(self) -> Dict[str, Dict[str, Any]]:
-        return {
-            strategy: {
-                "prizes": dict(prizes),
-                "total_tickets": self._ticket_counts_by_strategy.get(strategy, 0),
-            }
-            for strategy, prizes in self._prize_counts_by_strategy.items()
-        }
-
-    def get_advanced_prize_stats(self) -> Dict[str, Any]:
-        # entropie rozdeleni vyher - jestli jsou vyhry rovnomerne nebo ne
-        win_counts = [self._prize_counts.get(m, 0) for m in [3, 4, 5, 6]]
-        total_wins = sum(win_counts)
-        if total_wins == 0:
-            return {
-                "most_common_match_count": "-",
-                "prize_distribution_entropy": 0.0,
-                "max_entropy": float(np.log(4)),
-                "entropy_normalized": 0.0,
-            }
-
-        probabilities = np.array([c / total_wins for c in win_counts], dtype=float)
-        entropy = -np.sum(probabilities[probabilities > 0] * np.log(probabilities[probabilities > 0]))
-        max_entropy = np.log(4)
-        return {
-            "most_common_match_count": [3, 4, 5, 6][int(np.argmax(win_counts))],
-            "prize_distribution_entropy": float(entropy),
-            "max_entropy": float(max_entropy),
-            "entropy_normalized": float(entropy / max_entropy) if max_entropy > 0 else 0.0,
-        }
-
     def get_strategy_stats(self) -> Dict[str, Dict[str, Any]]:
         # souhrnne metriky pro kazdou strategii pres vsechny behy
+        # agenty si rozdelime podle strategie
         strategy_data: Dict[str, List[Dict[str, Any]]] = {}
         for run in self._runs:
             for agent in run.agent_summaries:
                 strategy_data.setdefault(agent["strategy"], []).append(agent)
 
         results: Dict[str, Dict[str, Any]] = {}
+        # pro kazdou strategii spocitame vlastni metriky
         for strategy, agents in strategy_data.items():
+            # z agentu vytahneme zakladni ekonomicke vysledky
             rois = np.array([a["roi"] for a in agents], dtype=float)
             profits = np.array([a["net_profit"] for a in agents], dtype=float)
             inactive = np.array([not a["active"] for a in agents], dtype=float)
@@ -226,6 +223,7 @@ class SberStatistik:
             strategy_tickets = int(self._ticket_counts_by_strategy.get(strategy, 0))
             strategy_wins = int(sum(self._prize_counts_by_strategy.get(strategy, {}).get(m, 0) for m in [3, 4, 5, 6]))
 
+            # ulozime souhrn jedne strategie
             results[strategy] = {
                 "count": len(agents),
                 "avg_roi_pct": float(np.mean(rois)),
@@ -251,6 +249,7 @@ class SberStatistik:
 
     def get_strategy_tests(self) -> Dict[str, Any]:
         # statisticke testy jestli se strategie od sebe vyznacne lisi
+        # skupiny ROI podle strategie, agregovane po MC bezich
         groups: Dict[str, List[float]] = {}
         for run in self._runs:
             by_strategy: Dict[str, List[float]] = {}
@@ -260,6 +259,7 @@ class SberStatistik:
                 if values:
                     groups.setdefault(strategy, []).append(float(np.mean(values)))
 
+        # testujeme jen strategie, ktere maji aspon dva behy
         arrays_by_name = {k: np.array(v, dtype=float) for k, v in groups.items() if len(v) >= 2}
         if len(arrays_by_name) < 2:
             return {"global": {}, "shapiro": [], "pairwise": []}
@@ -290,6 +290,7 @@ class SberStatistik:
             })
 
         # parove mann-whitney testy s bonferroniho korekci
+        # pripravime dvojice strategii pro parove testy
         names = sorted(arrays_by_name)
         raw_pairs = []
         for i, a in enumerate(names):
@@ -336,6 +337,7 @@ class SberStatistik:
         }
 
     def get_jackpot_diagnostics(self, config) -> Dict[str, Any]:
+        # zakladni diagnostiku jackpotu vezmeme z konfigurace
         diag = config.jackpot_diagnostics(self._total_tickets)
         jackpot_count = self._prize_counts.get(config.draw_size, 0)
         diag["observed_jackpots"] = jackpot_count
@@ -343,14 +345,13 @@ class SberStatistik:
         diag["jackpot_events_recorded"] = len(self._jackpot_events)
         return diag
 
-    def get_jackpot_events(self) -> List[Dict[str, Any]]:
-        return list(self._jackpot_events)
-
     def export_csv(self, output_dir: str | Path, config=None) -> None:
         # export vsech vysledku do CSV souboru
+        # pripravime vystupni slozku pro CSV soubory
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
 
+        # souhrn po jednotlivych MC bezich
         run_rows = []
         for run in self._runs:
             rev = float(run.operator_summary.get("total_revenue", 0) or 0)
@@ -368,9 +369,11 @@ class SberStatistik:
             })
         _write_csv(out / "run_summary.csv", run_rows)
 
+        # souhrn podle strategii
         strategy_rows = [{"strategy": name, **row} for name, row in self.get_strategy_stats().items()]
         _write_csv(out / "strategy_summary.csv", strategy_rows)
 
+        # souhrn strategie v kazdem konkretnim behu
         run_strategy_rows = []
         for run in self._runs:
             by_strategy: Dict[str, List[Dict[str, Any]]] = {}
@@ -394,6 +397,7 @@ class SberStatistik:
         _write_csv(out / "jackpot_events.csv", self._jackpot_events)
 
         if config is not None:
+            # tabulka porovnani empirickych a teoretickych vyher
             prize_rows = [{"match_count": k, **row} for k, row in self.get_prize_stats(config).items()]
             _write_csv(out / "prize_summary.csv", prize_rows)
 
@@ -407,6 +411,7 @@ class SberStatistik:
             _write_csv(out / "strategy_pairwise_tests.csv", tests["pairwise"])
 
     def print_summary(self, config=None) -> None:
+        # pripravime hlavni souhrny pro vypis do konzole
         op = self.get_operator_stats()
         strats = self.get_strategy_stats()
         prizes = self.get_prize_stats(config)
@@ -450,9 +455,11 @@ class SberStatistik:
 
 
 def _write_csv(path: Path, rows: List[Dict[str, Any]]) -> None:
+    # kdyz nejsou radky, vytvorime prazdny soubor
     if not rows:
         path.write_text("", encoding="utf-8")
         return
+    # zapiseme CSV s hlavickou
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         writer.writeheader()

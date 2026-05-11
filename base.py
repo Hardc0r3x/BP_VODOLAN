@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor obsahuje zakladni tridy Agent a Strategy.
+# Ostatni hraci a strategie z techto trid dedi.
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
@@ -7,7 +10,7 @@ if TYPE_CHECKING:
 
 
 # zakladni trida hrace - vsichni hraci z ni dedi
-# sama o sobe se pouzit neda, proste definuje co kazdy hrac musi umet
+# sama o sobe se nepouziva, jen definuje zakladni chovani hrace
 class Agent(ABC):
 
     def __init__(
@@ -17,6 +20,7 @@ class Agent(ABC):
         strategy: "Strategy",
         ticket_price: float,
     ) -> None:
+        # ulozime zakladni vlastnosti hrace
         self._id = agent_id
         self._initial_budget = initial_budget
         self._budget = initial_budget  # kolik ma prave ted - meni se kazde kolo
@@ -60,7 +64,7 @@ class Agent(ABC):
 
     @property
     def net_profit(self) -> float:
-        # kladne = vydelal (coz se skoro nestane), zaporne = prodělal
+        # kladne = vydelal, zaporne = prodelal
         return self._total_won - self._total_spent
 
     @property
@@ -135,6 +139,7 @@ class Agent(ABC):
         ticket_matches: List[int],
         ticket_prizes: List[float],
     ) -> Dict[str, Any]:
+        # vezmeme nejlepsi vysledek ze vsech tiketu hrace
         best_matches = max(ticket_matches) if ticket_matches else 0
         total_prize = float(sum(ticket_prizes))
         cost = float(pending.get("cost", 0.0))
@@ -163,21 +168,9 @@ class Agent(ABC):
         self._history.append(record)
         return record
 
-    def play_round(self, lottery: "Loterie") -> Optional[Dict[str, Any]]:
-        # zkracena verze kde se losovani deje uvnitr
-        pending = self.place_bets(lottery)
-        if pending is None:
-            return None
-        ticket_matches: List[int] = []
-        ticket_prizes: List[float] = []
-        for numbers in pending["ticket_numbers"]:
-            matches, prize = lottery.check_ticket(numbers)
-            ticket_matches.append(matches)
-            ticket_prizes.append(prize)
-        return self.resolve_bets(pending, ticket_matches, ticket_prizes)
-
     def revoke_unpaid_prize(self, amount: float) -> None:
         # provozovatel nema na vyplatu - musime odecist co jsme uz prictli
+        # kdyz neni co vracet, nic nedelame
         if amount <= 0:
             return
         self._budget -= amount
@@ -210,6 +203,7 @@ class Agent(ABC):
 
     def reset(self, new_budget: Optional[float] = None) -> None:
         # reset na zacatek pred dalsim MC behem
+        # pokud je zadany novy rozpocet, pouzijeme ho, jinak puvodni
         self._budget = new_budget if new_budget is not None else self._initial_budget
         self._total_spent = 0.0
         self._total_won = 0.0
@@ -219,6 +213,7 @@ class Agent(ABC):
         self._strategy.reset()
 
     def __repr__(self) -> str:
+        # kratky textovy vypis objektu pro debug
         return (
             f"{self.__class__.__name__}(id={self._id!r}, "
             f"strategy={self._strategy.name!r}, budget={self._budget:.0f} CZK)"
@@ -241,7 +236,7 @@ class Strategy(ABC):
 
     @abstractmethod
     def determine_num_tickets(self, agent: "Agent") -> int:
-        # vrati kolik tiketu hrac koupí v tomhle kole
+        # vrati kolik tiketu hrac koupi v tomhle kole
         ...
 
     def on_round_result(self, agent: "Agent", matches: int, prize: float, cost: float = 0.0) -> None:
@@ -249,6 +244,7 @@ class Strategy(ABC):
         pass
 
     def reset(self) -> None:
+        # defaultne strategie nema co resetovat
         pass
 
     def __repr__(self) -> str:

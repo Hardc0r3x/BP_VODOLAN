@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+# Soubor slouzi jako vstupni bod programu.
+# Odtud se spousti baseline, scenare, exporty a grafy.
+
 import argparse
 import json
 from dataclasses import asdict, replace
 from pathlib import Path
-from typing import Optional
-
 from tqdm import tqdm
 
 from config import Config
@@ -26,6 +27,7 @@ PROFILES = {
 
 
 def _print_header(profile: str, config: Config, agents: list | None = None) -> None:
+    # vypis hlavicky programu
     print("=" * 72)
     print("  Simulace hernich strategii v ciselnych loteriich")
     print("  Bakalarska prace - agentni modelovani a Monte Carlo")
@@ -37,7 +39,9 @@ def _print_header(profile: str, config: Config, agents: list | None = None) -> N
 
 def _print_population(agents) -> None:
     # vypise kolik agentu hraje jakou strategii
+    # slovnik pro pocet agentu podle strategie
     counts: dict[str, int] = {}
+    # projdeme vsechny agenty v populaci
     for agent in agents:
         counts[agent.strategy.name] = counts.get(agent.strategy.name, 0) + 1
     print(f"\nPopulace ({len(agents)} agentu):")
@@ -47,23 +51,35 @@ def _print_population(agents) -> None:
 
 def run_baseline(config: Config, output_dir: Path, profile: str) -> SberStatistik:
     # zakladni simulace se standardnim mixem strategii
+    # vytvorime standardni populaci hracu
     agents = TovarnaNaHrace.standard_mix(config)
     _print_header(profile, config, agents)
     _print_population(agents)
 
     print(f"\nSpoustim zakladni simulaci ({config.num_simulations} behu)...")
+    # pripravime sberac statistik
     stats = SberStatistik()
+    # vytvorime objekt simulace
     sim = MCSimulace(config=config, agents=agents, stats_collector=stats)
 
     # progress bar aby bylo videt jak daleko to je
     pbar = tqdm(total=config.num_simulations, unit="beh")
-    sim.set_progress_callback(lambda done, total: pbar.update(1))
+
+    def update_progress(done, total):
+        # po kazdem behu posuneme progress bar
+        pbar.update(1)
+
+    # napojime progress bar na simulaci
+    sim.set_progress_callback(update_progress)
+    # spustime samotnou simulaci
     sim.run()
     pbar.close()
 
+    # vypiseme vysledky do konzole
     stats.print_summary(config=config)
 
     # vygenerovat grafy a exportovat data
+    # cesty pro grafy a CSV vystupy
     figures_dir = output_dir / "figures"
     csv_dir = output_dir / "csv"
     generate_all(stats, scenario_results=None, output_dir=str(figures_dir), config=config)
@@ -71,6 +87,7 @@ def run_baseline(config: Config, output_dir: Path, profile: str) -> SberStatisti
     export_reference_outputs(output_dir / "reference")
 
     # ulozit metadata o behu aby bylo jasne s cim se to pustilo
+    # metadata ukladam kvuli reprodukovatelnosti behu
     metadata = {
         "profile": profile,
         "config": asdict(config),
@@ -87,7 +104,9 @@ def run_scenarios(base_config: Config, output_dir: Path) -> dict:
     print("\n" + "=" * 72)
     print("  What-If scenare")
     print("=" * 72)
+    # vytvorime spravce what-if scenaru
     runner = SpravceScenaru(base_config)
+    # spustime vsechny scenare
     results = runner.run_all(verbose=True)
     runner.print_comparison(results)
     runner.export_comparison_csv(results, output_dir / "csv" / "scenario_summary.csv")
@@ -98,6 +117,7 @@ def run_scenarios(base_config: Config, output_dir: Path) -> dict:
 def run_specific_scenario(scenario_name: str, base_config: Config, output_dir: Path, profile: str) -> None:
     # spustit jeden konkretni scenar
     runner = SpravceScenaru(base_config)
+    # najdeme pozadovany scenar podle nazvu
     scenario = runner.get(scenario_name)
     if scenario is None:
         print(f"Neznamy scenar: {scenario_name}")
@@ -106,6 +126,7 @@ def run_specific_scenario(scenario_name: str, base_config: Config, output_dir: P
             print(f"  {item.name:<28} {item.description}")
         return
 
+    # vezmeme konfiguraci a populaci daneho scenare
     config = scenario.config
     agents = scenario.population_builder(config)
     _print_header(profile, config, agents)
@@ -117,7 +138,11 @@ def run_specific_scenario(scenario_name: str, base_config: Config, output_dir: P
     stats = SberStatistik()
     sim = MCSimulace(config=config, agents=agents, stats_collector=stats)
     pbar = tqdm(total=config.num_simulations, unit="beh")
-    sim.set_progress_callback(lambda done, total: pbar.update(1))
+
+    def update_progress(done, total):
+        pbar.update(1)
+
+    sim.set_progress_callback(update_progress)
     sim.run()
     pbar.close()
 
@@ -153,6 +178,7 @@ def build_config_from_args(args: argparse.Namespace) -> Config:
 
 
 def parse_args() -> argparse.Namespace:
+    # nastaveni argumentu prikazove radky
     parser = argparse.ArgumentParser(
         description="Simulace hernich strategii v ciselnych loteriich",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -166,6 +192,7 @@ Priklady:
   uv run main.py --list-scenarios
         """,
     )
+    # profil urcuje hlavne pocet MC behu
     parser.add_argument("--profile", choices=PROFILES.keys(), default="thesis")
     parser.add_argument("--scenarios", action="store_true", help="Spustit vsechny What-If scenare po baseline")
     parser.add_argument("--scenario", type=str, default=None, help="Spustit pouze konkretni scenar")
@@ -179,8 +206,11 @@ Priklady:
 
 
 def main() -> None:
+    # nacteme argumenty z prikazove radky
     args = parse_args()
+    # sestavime konfiguraci podle profilu a argumentu
     config = build_config_from_args(args)
+    # urcime vystupni slozku
     output_dir = Path(args.output_dir or f"output_{args.profile}")
     output_dir.mkdir(parents=True, exist_ok=True)
 

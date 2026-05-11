@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+# Soubor obsahuje model provozovatele loterie.
+# Provozovatel spravuje volny kapital a oddeleny jackpotovy fond.
 from typing import Dict, List, Any
 
 from config import Config
@@ -9,6 +12,7 @@ from config import Config
 class Provozovatel:
 
     def __init__(self, config: Config) -> None:
+        # ulozime konfiguraci a pocatecni kapital
         self._config = config
         self._initial_capital = config.operator_initial_capital
 
@@ -85,7 +89,9 @@ class Provozovatel:
             self._bankruptcy_round = current_round
 
     def pay_prize(self, amount: float, current_round: int | None = None, is_jackpot: bool = False) -> bool:
+        # vyplati vyhru bud z kapitalu nebo z jackpotoveho fondu
         if amount <= 0:
+            # nulovou vyhru neni potreba platit
             return True
 
         # mala tolerance kvuli desetinnym cislum

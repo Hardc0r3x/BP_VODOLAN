@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Soubor drzi hlavni parametry modelu.
+# Z techto hodnot se pocita loterie, RTP, EV a profily behu.
+
 from dataclasses import dataclass, field, replace
 from math import comb, exp
 from typing import Dict, Tuple
@@ -41,22 +44,27 @@ SEED: int = 42
 class Config:
     lottery_name: str = LOTTERY_NAME
 
+    # zakladni parametry losovani
     num_balls: int = NUM_BALLS
     draw_size: int = DRAW_SIZE
     ticket_price: float = TICKET_PRICE
 
+    # podil trzeb, ktery jde do jackpotoveho fondu
     prize_pool_ratio: float = PRIZE_POOL_RATIO
     fixed_prizes: Dict[int, float] = field(default_factory=lambda: dict(FIXED_PRIZES))
 
+    # nastaveni jackpotu a kapitalu provozovatele
     jackpot_rollover: bool = JACKPOT_ROLLOVER
     min_jackpot: float = MIN_JACKPOT
     operator_initial_capital: float = OPERATOR_INITIAL_CAPITAL
 
+    # nastaveni populace hracu
     num_agents: int = NUM_AGENTS
     agent_budget_range: Tuple[float, float] = field(default_factory=lambda: AGENT_BUDGET_RANGE)
     agent_cautious_ratio: float = AGENT_CAUTIOUS_RATIO
     hot_cold_pool_multiplier: int = HOT_COLD_POOL_MULTIPLIER
     martingale_max_tickets: int = MARTINGALE_MAX_TICKETS
+    # nastaveni delky a poctu simulaci
     num_rounds: int = NUM_ROUNDS
     num_simulations: int = NUM_SIMULATIONS
     seed: int = SEED
@@ -127,6 +135,7 @@ class Config:
         return exp(-self.expected_jackpots(total_tickets))
 
     def jackpot_diagnostics(self, total_tickets: int | float) -> dict:
+        # nejdriv spocitame ocekavany pocet jackpotu
         expected = self.expected_jackpots(total_tickets)
         p_zero = self.probability_no_jackpot(total_tickets)
         return {
@@ -139,6 +148,7 @@ class Config:
         }
 
     def summary_str(self, agents: list | None = None) -> str:
+        # textovy souhrn pro vypis do konzole
         lines = [
             f"  Loterie: {self.lottery_name}",
             f"  Format: {self.draw_size}/{self.num_balls}",
@@ -151,6 +161,7 @@ class Config:
         ]
 
         if agents is not None and len(agents) > 0:
+            # spocitame mix strategii podle vytvorenych agentu
             counts = {}
             for agent in agents:
                 counts[agent.strategy.name] = counts.get(agent.strategy.name, 0) + 1
@@ -167,7 +178,7 @@ class Config:
             aggressive = total - cautious
             lines.append(f"  Mix typu: {cautious/total*100:.0f} % opatrnych ({cautious}) / {aggressive/total*100:.0f} % agresivnich ({aggressive})")
         else:
-            # Fallback when agents are not provided
+            # kdyz agenti nejsou predani, vypiseme jen cilovy pomer typu hracu
             lines.append(f"  Mix typu (cilovy): {self.agent_cautious_ratio * 100:.0f} % opatrnych / {(1 - self.agent_cautious_ratio) * 100:.0f} % agresivnich")
 
         lines.extend([
